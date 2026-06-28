@@ -1,0 +1,14 @@
+# Executables
+*.exe
+*.out
+*.app
+
+# Compiled Object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Precompiled Headers
+*.gch
+*.pch
