@@ -1,10 +1,16 @@
 #include "event_queue.h"
-
+// #include "system.h"
 #include "stm32f4xx.h" 
+#include "stm32f4xx.h"
+#include <stddef.h>
 
+// Bare-metal assert: If the expression is false, freeze the CPU safely
+#ifndef ASSERT
+#define ASSERT(expr) do { if (!(expr)) { __disable_irq(); while(1); } } while(0)
+#endif
 static event_t  s_queue[EVENT_QUEUE_DEPTH]; 
-static uint16_t s_head = 0;
-static uint16_t s_tail = 0;
+static uint16_t s_head = 0; // counter for event to be posted
+static uint16_t s_tail = 0; // counter for reading the post
 
 event_status_t eventQueue_init(void) {
     s_head = 0;

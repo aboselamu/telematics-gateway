@@ -7,6 +7,7 @@
 typedef enum {
     EVENT_QUEUE_OK,
     EVENT_QUEUE_FULL,
+    EVT_UART_FRAME_READY,
     EVENT_QUEUE_EMPTY,
     EVENT_QUEUE_ERROR
 } event_status_t;

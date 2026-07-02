@@ -1,9 +1,9 @@
 # =============================================================================
-# KOAS-V1.0 — Kitchen Order Alert System
-# Target: STM32F103C8T6 (Blue Pill), Cortex-M3, 8MHz HSI
+# Telematics Gateway - Explicit Build (KOAS Strategy)
+# Target    : STM32F446RET6 (NUCLEO-F446RE)
 # =============================================================================
 
-TARGET    = KOAS_V1
+TARGET    = telematics_gateway
 BUILD_DIR = build
 
 # --- Toolchain ---
@@ -13,138 +13,89 @@ AS      = $(PREFIX)gcc
 OBJCOPY = $(PREFIX)objcopy
 SIZE    = $(PREFIX)size
 
-# --- MCU — Cortex-M3, NO FPU (STM32F103 has none) ---
-CPU = -mcpu=cortex-m3
-MCU = $(CPU) -mthumb
+# --- Architecture flags ---
+ARCH_FLAGS = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
 # --- Include paths ---
-INCLUDES = \
-    -ICore/Inc \
-    -IApp/Inc \
-    -IDrivers/BSP/Inc \
-    -IDrivers/MCU_Drivers/Inc \
-    -IDrivers/CMSIS/Device/STM32F1xx/Include \
-    -IDrivers/CMSIS/Include
-
-# --- Defines ---
-DEFS = -DSTM32F103xB
+INCLUDES = -Iapp/inc \
+           -Imiddleware/event_queue/inc \
+           -Idrivers/peripheral/uart \
+           -Iplatform/inc \
+           -Ithird_party/cmsis/Core/Include \
+           -Ithird_party/cmsis/Device/STSTM32F4xx/Include
 
 # --- Compiler flags ---
-CFLAGS = $(MCU) $(DEFS) $(INCLUDES) \
-    -Wall \
-    -Wextra \
-    -O0 \
-    -g3 \
-    -ffunction-sections \
-    -fdata-sections
+CFLAGS = $(ARCH_FLAGS) -DSTM32F446xx -DDEBUG $(INCLUDES) \
+         -Wall -Wextra -std=c11 -O0 -g3 -ffunction-sections -fdata-sections
 
 # --- Linker flags ---
-LDSCRIPT = startup/stm32f103c8tx_flash.ld
+LDFLAGS = $(ARCH_FLAGS) -Tlinker/STM32F446RETX_FLASH.ld \
+          -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--gc-sections \
+          --specs=nano.specs --specs=nosys.specs -lc -lm
 
-LDFLAGS = \
-    $(MCU) \
-    -T$(LDSCRIPT) \
-    -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--gc-sections \
-    --specs=nosys.specs \
-    -lc -lm
+# --- Object Files ---
+C_OBJS = $(BUILD_DIR)/main.o \
+         $(BUILD_DIR)/event_queue.o \
+         $(BUILD_DIR)/uart_driver.o \
+         $(BUILD_DIR)/system_stm32f4xx.o
 
-# --- C source files ---
-C_SRCS = \
-    Core/Src/main.c \
-    Core/Src/stm32_it.c \
-    App/Src/order_alert_fsm.c \
-    Drivers/MCU_Drivers/Src/exti_driver.c \
-    Drivers/MCU_Drivers/Src/pwm_driver.c \
-    Drivers/MCU_Drivers/Src/buzzer_driver.c \
-    Drivers/MCU_Drivers/Src/led_driver.c \
-    Drivers/MCU_Drivers/Src/ir_sensor_driver.c \
-    Drivers/BSP/Src/board.c
-
-# --- Assembly startup ---
-ASM_SRC = startup/startup_stm32f103xb.s
-
-# --- Object files (all flat in build/ — avoids Windows mkdir -p issues) ---
-C_OBJS = \
-    $(BUILD_DIR)/main.o \
-    $(BUILD_DIR)/stm32_it.o \
-    $(BUILD_DIR)/order_alert_fsm.o \
-    $(BUILD_DIR)/exti_driver.o \
-    $(BUILD_DIR)/pwm_driver.o \
-    $(BUILD_DIR)/buzzer_driver.o \
-    $(BUILD_DIR)/led_driver.o \
-    $(BUILD_DIR)/ir_sensor_driver.o \
-    $(BUILD_DIR)/board.o
-
-ASM_OBJ = $(BUILD_DIR)/startup.o
-
-ALL_OBJS = $(C_OBJS) $(ASM_OBJ)
+ASM_OBJS = $(BUILD_DIR)/startup.o
 
 # =============================================================================
-# Targets
+# Build Targets
 # =============================================================================
 
-all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).bin
-	@echo ""
-	@echo "  Build complete: $(BUILD_DIR)/$(TARGET).bin"
-	@echo ""
+all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).bin size
 
-# Create build directory (simple mkdir, no -p needed since it is flat)
 $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
 
-# Compile C files — explicit rules, no pattern subdirectory needed
-$(BUILD_DIR)/main.o: Core/Src/main.c
+# -----------------------------------------------------------------------------
+# Explicit C compilation rules (The KOAS Strategy)
+# -----------------------------------------------------------------------------
+$(BUILD_DIR)/main.o: app/src/main.c
+	@echo "  CC  app/src/main.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/stm32_it.o: Core/Src/stm32_it.c
+$(BUILD_DIR)/event_queue.o: middleware/event_queue/src/event_queue.c
+	@echo "  CC  middleware/event_queue/src/event_queue.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/order_alert_fsm.o: App/Src/order_alert_fsm.c
+$(BUILD_DIR)/uart_driver.o: drivers/peripheral/uart/uart_driver.c
+	@echo "  CC  drivers/peripheral/uart/uart_driver.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/exti_driver.o: Drivers/MCU_Drivers/Src/exti_driver.c
+$(BUILD_DIR)/system_stm32f4xx.o: platform/src/system_stm32f4xx.c
+	@echo "  CC  platform/src/system_stm32f4xx.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/pwm_driver.o: Drivers/MCU_Drivers/Src/pwm_driver.c
-	$(CC) $(CFLAGS) -c $< -o $@
+# -----------------------------------------------------------------------------
+# Explicit Assembly compilation rule
+# -----------------------------------------------------------------------------
+$(BUILD_DIR)/startup.o: startup/startup_stm32f446xx.s
+	@echo "  AS  startup/startup_stm32f446xx.s"
+	$(AS) $(ARCH_FLAGS) -x assembler-with-cpp -c $< -o $@
 
-$(BUILD_DIR)/buzzer_driver.o: Drivers/MCU_Drivers/Src/buzzer_driver.c
-	$(CC) $(CFLAGS) -c $< -o $@
+# -----------------------------------------------------------------------------
+# Link & Binary
+# -----------------------------------------------------------------------------
+$(BUILD_DIR)/$(TARGET).elf: $(C_OBJS) $(ASM_OBJS)
+	@echo "  LD  $@"
+	$(CC) $(LDFLAGS) $^ -o $@
 
-$(BUILD_DIR)/led_driver.o: Drivers/MCU_Drivers/Src/led_driver.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/ir_sensor_driver.o: Drivers/MCU_Drivers/Src/ir_sensor_driver.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/board.o: Drivers/BSP/Src/board.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# Compile startup assembly
-$(BUILD_DIR)/startup.o: startup/startup_stm32f103xb.s
-	$(AS) -x assembler-with-cpp $(MCU) -c $< -o $@
-
-# Link
-$(BUILD_DIR)/$(TARGET).elf: $(ALL_OBJS)
-	$(CC) $(ALL_OBJS) $(LDFLAGS) -o $@
-	$(SIZE) $@
-
-# Binary
 $(BUILD_DIR)/$(TARGET).bin: $(BUILD_DIR)/$(TARGET).elf
 	$(OBJCOPY) -O binary $< $@
 
-# =============================================================================
-# Flash via OpenOCD + ST-Link
-# =============================================================================
-flash: $(BUILD_DIR)/$(TARGET).elf
-	openocd -f interface/stlink.cfg \
-	        -f target/stm32f1x.cfg  \
-	        -c "program $(BUILD_DIR)/$(TARGET).elf verify reset exit"
+size: $(BUILD_DIR)/$(TARGET).elf
+	$(SIZE) $<
 
 # =============================================================================
-# Clean
+# Utility Targets
 # =============================================================================
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all flash clean
+flash: $(BUILD_DIR)/$(TARGET).elf
+	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $< verify reset exit"
+
+.PHONY: all clean flash size
