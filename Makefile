@@ -20,6 +20,8 @@ ARCH_FLAGS = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 INCLUDES = -Iapp/inc \
            -Imiddleware/event_queue/inc \
            -Idrivers/peripheral/uart \
+		   -Idrivers/peripheral/dma/inc \
+		   -Idrivers/peripheral/dma/src \
            -Iplatform/inc \
            -Ithird_party/cmsis/Core/Include \
            -Ithird_party/cmsis/Device/STSTM32F4xx/Include
@@ -37,6 +39,7 @@ LDFLAGS = $(ARCH_FLAGS) -Tlinker/STM32F446RETX_FLASH.ld \
 C_OBJS = $(BUILD_DIR)/main.o \
          $(BUILD_DIR)/event_queue.o \
          $(BUILD_DIR)/uart_driver.o \
+         $(BUILD_DIR)/dma_driver.o \
          $(BUILD_DIR)/system_stm32f4xx.o
 
 ASM_OBJS = $(BUILD_DIR)/startup.o
@@ -63,6 +66,10 @@ $(BUILD_DIR)/event_queue.o: middleware/event_queue/src/event_queue.c
 
 $(BUILD_DIR)/uart_driver.o: drivers/peripheral/uart/uart_driver.c
 	@echo "  CC  drivers/peripheral/uart/uart_driver.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/dma_driver.o: drivers/peripheral/dma/src/dma_driver.c
+	@echo "  CC  drivers/peripheral/dma/src/dma_driver.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/system_stm32f4xx.o: platform/src/system_stm32f4xx.c
