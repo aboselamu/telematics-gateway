@@ -7,6 +7,7 @@
 
 #include "uart_driver.h"
 #include "event_queue.h"
+#include "dma_driver.h" // ADD THIS LINE (use your actual header file name)
 #include "stm32f4xx.h"  // Core CMSIS and Peripheral Register Definitions
 #include <stddef.h>
 
@@ -67,7 +68,13 @@ uart_status_t uart_init(const uart_config_t *p_config) {
     }
 
     // Configure Control Register 1: Enable TX, RX, and RXNE Interrupt
-    USART2->CR1 |= (USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE);
+    // USART2->CR1 |= (USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE);
+
+    // Configure Control Register 1: Enable TX, and RX
+    USART2->CR1 |= (USART_CR1_TE | USART_CR1_RE);
+    // Route incoming data signals directly to the DMA hardware
+    USART2->CR3 |= USART_CR3_DMAR;  
+
 
     // Enable the Peripheral globally
     USART2->CR1 |= USART_CR1_UE;
@@ -113,43 +120,28 @@ uart_status_t uart_send(const uint8_t *p_data, uint16_t length) {
     return UART_OK; 
 }
 
-uint16_t uart_read(uint8_t *p_dest, uint16_t max_len, uint16_t claim_ticket) {
-    uint16_t bytes_read = 0;
 
-    // Safety Boundary Check: Abort if queue is completely empty
-    if (s_rx_tail == s_rx_head) {
-        return 0;
+
+uart_status_t uart_read(uint8_t *p_data) {
+    if (p_data == NULL) {
+        return UART_ERR_PARAM;
     }
 
-    // Decoupled Cursor: Traverse buffer using a localized variable
-    // Ensures the ISR boundaries aren't chasing a rapidly oscillating target
-    uint16_t read_cursor = s_rx_tail;
+    // 1. Calculate the dynamic head cursor based on the DMA's countdown timer
+    uint16_t current_head = 256 - dma1_stream5_get_ndtr();
 
-    // Leave exactly 1 byte free at the end of max_len for secure null-termination
-    while (bytes_read < (max_len - 1)) {
-        
-        p_dest[bytes_read] = s_rx_buffer[read_cursor];
-        bytes_read++;
-
-        // Check if the decoupled cursor hit the precise ticket boundary
-        if (read_cursor == claim_ticket) {
-            break;
-        }
-
-        read_cursor = (read_cursor + 1) & RX_BUFFER_MASK;
+    // 2. If tail catches up to head, there is no new data to read
+    if (s_rx_tail == current_head) {
+        return UART_ERR_EMPTY; // Use whatever your specific empty status macro is
     }
 
-    // Append null-termination to secure string manipulation tasks in app layer
-    p_dest[bytes_read] = '\0';
+    // 3. Extract the byte
+    *p_data = s_rx_buffer[s_rx_tail];
 
-    // The Critical Section Flush
-    // Whether completed cleanly or truncated early due to max_len constraints,
-    // the hardware tail is fast-forwarded atomically to release used slots instantly.
-    __disable_irq();
-    s_rx_tail = (claim_ticket + 1) & RX_BUFFER_MASK;
-    __enable_irq();
+    // 4. Advance the tail safely using the bitwise mask for perfect wrap-around
+    s_rx_tail = (s_rx_tail + 1) & RX_BUFFER_MASK;
 
-    return bytes_read;
+    return UART_OK;
 }
 
 void USART2_IRQHandler(void) {

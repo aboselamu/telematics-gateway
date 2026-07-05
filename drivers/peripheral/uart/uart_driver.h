@@ -15,6 +15,7 @@ typedef enum {
     UART_OK = 0,
     UART_ERR_PARAM,
     UART_ERR_BUSY,
+    UART_ERR_EMPTY,
     UART_ERR_OVERFLOW
 } uart_status_t;
 
@@ -50,6 +51,6 @@ uart_status_t uart_send(const uint8_t *p_data, uint16_t length);
  * @param claim_ticket The hardware ring buffer index corresponding to the end of the frame ('\n').
  * @return uint16_t The exact number of bytes successfully extracted and written to p_dest.
  */
-uint16_t uart_read(uint8_t *p_dest, uint16_t max_len, uint16_t claim_ticket);
+uart_status_t uart_read(uint8_t *p_data);
 
 // #endif /* UART_DRIVER_H_ */
