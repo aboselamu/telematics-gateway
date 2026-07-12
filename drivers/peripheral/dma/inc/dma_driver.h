@@ -5,10 +5,10 @@
 #include <stdint.h>
 
 // Initializes DMA1 Stream 5 for peripheral-to-memory transfer (Targeted for USART2 RX).
-void dma1_stream5_usart2_rx_init(volatile uint8_t * dest_buffer, uint16_t buffer_size);
+void dma1_stream2_uart4_rx_init(volatile uint8_t * dest_buffer, uint16_t buffer_size);
 
 
 // get ndtr 
-uint16_t dma1_stream5_get_ndtr(void);
+uint16_t dma1_stream2_get_ndtr(void);
 
 #endif // DMA_DRIVER_H

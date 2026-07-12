@@ -53,4 +53,9 @@ uart_status_t uart_send(const uint8_t *p_data, uint16_t length);
  */
 uart_status_t uart_read(uint8_t *p_data);
 
+// temporary acces to test parsing logic
+const char *uart_get_frame(void);
+
+/* uart_process_rx() detects frame boundaries. */
+void uart_process_rx(void);
 // #endif /* UART_DRIVER_H_ */
