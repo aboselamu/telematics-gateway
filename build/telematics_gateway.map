@@ -36,6 +36,8 @@ C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eab
                               C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-findfp.o) (_fflush_r)
 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-sbrkr.o)
                               C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-mallocr.o) (_sbrk_r)
+C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)
+                              build/nmea_parser.o (strncmp)
 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libnosys.a(close.o)
                               C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-closer.o) (_close)
 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libnosys.a(lseek.o)
@@ -320,20 +322,6 @@ Discarded input sections
  .group         0x00000000        0xc build/main.o
  .group         0x00000000        0xc build/main.o
  .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
- .group         0x00000000        0xc build/main.o
  .text          0x00000000        0x0 build/main.o
  .data          0x00000000        0x0 build/main.o
  .bss           0x00000000        0x0 build/main.o
@@ -358,10 +346,6 @@ Discarded input sections
  .text          0x00000000        0x0 build/event_queue.o
  .data          0x00000000        0x0 build/event_queue.o
  .bss           0x00000000        0x0 build/event_queue.o
- .text.eventQueue_init
-                0x00000000       0x24 build/event_queue.o
- .text.eventQueue_poll
-                0x00000000       0x8c build/event_queue.o
  .debug_macro   0x00000000      0xaea build/event_queue.o
  .debug_macro   0x00000000       0x22 build/event_queue.o
  .debug_macro   0x00000000       0x56 build/event_queue.o
@@ -379,7 +363,30 @@ Discarded input sections
  .debug_macro   0x00000000      0x11f build/event_queue.o
  .debug_macro   0x00000000    0x1675e build/event_queue.o
  .debug_macro   0x00000000       0x6d build/event_queue.o
- .debug_macro   0x00000000      0x190 build/event_queue.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .group         0x00000000        0xc build/nmea_parser.o
+ .text          0x00000000        0x0 build/nmea_parser.o
+ .data          0x00000000        0x0 build/nmea_parser.o
+ .bss           0x00000000        0x0 build/nmea_parser.o
+ .debug_macro   0x00000000      0xaea build/nmea_parser.o
+ .debug_macro   0x00000000       0x22 build/nmea_parser.o
+ .debug_macro   0x00000000      0x190 build/nmea_parser.o
  .group         0x00000000        0xc build/uart_driver.o
  .group         0x00000000        0xc build/uart_driver.o
  .group         0x00000000        0xc build/uart_driver.o
@@ -440,8 +447,6 @@ Discarded input sections
  .text          0x00000000        0x0 build/dma_driver.o
  .data          0x00000000        0x0 build/dma_driver.o
  .bss           0x00000000        0x0 build/dma_driver.o
- .text.dma1_stream5_usart2_rx_init
-                0x00000000       0x78 build/dma_driver.o
  .debug_macro   0x00000000      0xaea build/dma_driver.o
  .debug_macro   0x00000000       0x2e build/dma_driver.o
  .debug_macro   0x00000000       0x28 build/dma_driver.o
@@ -496,6 +501,9 @@ Discarded input sections
  .text          0x00000000       0x14 build/startup.o
  .data          0x00000000        0x0 build/startup.o
  .bss           0x00000000        0x0 build/startup.o
+ .text          0x00000000        0x0 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)
+ .data          0x00000000        0x0 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)
+ .bss           0x00000000        0x0 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)
  .text          0x00000000        0x0 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libnosys.a(close.o)
  .data          0x00000000        0x0 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libnosys.a(close.o)
  .bss           0x00000000        0x0 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libnosys.a(close.o)
@@ -582,6 +590,7 @@ LOAD C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-non
 LOAD C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libm.a
 LOAD build/main.o
 LOAD build/event_queue.o
+LOAD build/nmea_parser.o
 LOAD build/uart_driver.o
 LOAD build/dma_driver.o
 LOAD build/system_stm32f4xx.o
@@ -611,174 +620,202 @@ LOAD C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-non
                 0x08000000                g_pfnVectors
                 0x080001c4                        . = ALIGN (0x4)
 
-.text           0x080001c4      0x548
+.text           0x080001c4      0x86c
                 0x080001c4                        . = ALIGN (0x4)
  *(.text)
  *(.text*)
- .text.SystemClock_Config
-                0x080001c4       0x9c build/main.o
-                0x080001c4                SystemClock_Config
- .text.error_pin_init
-                0x08000260       0x40 build/main.o
-                0x08000260                error_pin_init
- .text.main     0x080002a0       0x58 build/main.o
-                0x080002a0                main
+ .text.USART1_Init
+                0x080001c4       0x78 build/main.o
+                0x080001c4                USART1_Init
+ .text.USART1_Write_Raw
+                0x0800023c       0x2c build/main.o
+                0x0800023c                USART1_Write_Raw
+ .text.USART1_Write_String
+                0x08000268       0x2a build/main.o
+                0x08000268                USART1_Write_String
+ *fill*         0x08000292        0x2 
+ .text.main     0x08000294       0xf8 build/main.o
+                0x08000294                main
+ .text.eventQueue_init
+                0x0800038c       0x24 build/event_queue.o
+                0x0800038c                eventQueue_init
  .text.eventQueue_post
-                0x080002f8       0x8c build/event_queue.o
-                0x080002f8                eventQueue_post
+                0x080003b0       0x8c build/event_queue.o
+                0x080003b0                eventQueue_post
+ .text.eventQueue_poll
+                0x0800043c       0x8c build/event_queue.o
+                0x0800043c                eventQueue_poll
+ .text.nmea_parse
+                0x080004c8       0xa4 build/nmea_parser.o
+                0x080004c8                nmea_parse
  .text.__NVIC_EnableIRQ
-                0x08000384       0x38 build/uart_driver.o
+                0x0800056c       0x38 build/uart_driver.o
  .text.__NVIC_SetPriority
-                0x080003bc       0x54 build/uart_driver.o
+                0x080005a4       0x54 build/uart_driver.o
  .text.uart_init
-                0x08000410       0xec build/uart_driver.o
-                0x08000410                uart_init
+                0x080005f8       0xf4 build/uart_driver.o
+                0x080005f8                uart_init
  .text.uart_read
-                0x080004fc       0x64 build/uart_driver.o
-                0x080004fc                uart_read
- .text.USART2_IRQHandler
-                0x08000560       0xf4 build/uart_driver.o
-                0x08000560                USART2_IRQHandler
- .text.dma1_stream5_get_ndtr
-                0x08000654       0x18 build/dma_driver.o
-                0x08000654                dma1_stream5_get_ndtr
+                0x080006ec       0x64 build/uart_driver.o
+                0x080006ec                uart_read
+ .text.uart_process_rx
+                0x08000750       0x78 build/uart_driver.o
+                0x08000750                uart_process_rx
+ .text.uart_get_frame
+                0x080007c8       0x14 build/uart_driver.o
+                0x080007c8                uart_get_frame
+ .text.UART4_IRQHandler
+                0x080007dc       0x74 build/uart_driver.o
+                0x080007dc                UART4_IRQHandler
+ .text.dma1_stream2_uart4_rx_init
+                0x08000850       0x88 build/dma_driver.o
+                0x08000850                dma1_stream2_uart4_rx_init
+ .text.dma1_stream2_get_ndtr
+                0x080008d8       0x18 build/dma_driver.o
+                0x080008d8                dma1_stream2_get_ndtr
  .text.SystemInit
-                0x0800066c       0x50 build/system_stm32f4xx.o
-                0x0800066c                SystemInit
+                0x080008f0       0x50 build/system_stm32f4xx.o
+                0x080008f0                SystemInit
  .text.Reset_Handler
-                0x080006bc       0x4c build/startup.o
-                0x080006bc                Reset_Handler
+                0x08000940       0x4c build/startup.o
+                0x08000940                Reset_Handler
  .text.Default_Handler
-                0x08000708        0x2 build/startup.o
-                0x08000708                RTC_Alarm_IRQHandler
-                0x08000708                EXTI2_IRQHandler
-                0x08000708                TIM8_CC_IRQHandler
-                0x08000708                DebugMon_Handler
-                0x08000708                FMPI2C1_EV_IRQHandler
-                0x08000708                SPI4_IRQHandler
-                0x08000708                TIM1_CC_IRQHandler
-                0x08000708                DMA2_Stream5_IRQHandler
-                0x08000708                HardFault_Handler
-                0x08000708                DMA1_Stream5_IRQHandler
-                0x08000708                SysTick_Handler
-                0x08000708                PVD_IRQHandler
-                0x08000708                SDIO_IRQHandler
-                0x08000708                TAMP_STAMP_IRQHandler
-                0x08000708                PendSV_Handler
-                0x08000708                NMI_Handler
-                0x08000708                CAN2_RX1_IRQHandler
-                0x08000708                EXTI3_IRQHandler
-                0x08000708                TIM8_TRG_COM_TIM14_IRQHandler
-                0x08000708                TIM1_UP_TIM10_IRQHandler
-                0x08000708                TIM8_UP_TIM13_IRQHandler
-                0x08000708                I2C3_ER_IRQHandler
-                0x08000708                EXTI0_IRQHandler
-                0x08000708                I2C2_EV_IRQHandler
-                0x08000708                DMA1_Stream2_IRQHandler
-                0x08000708                CAN1_RX0_IRQHandler
-                0x08000708                FPU_IRQHandler
-                0x08000708                OTG_HS_WKUP_IRQHandler
-                0x08000708                UsageFault_Handler
-                0x08000708                CAN2_SCE_IRQHandler
-                0x08000708                DMA2_Stream2_IRQHandler
-                0x08000708                SPI1_IRQHandler
-                0x08000708                TIM6_DAC_IRQHandler
-                0x08000708                TIM1_BRK_TIM9_IRQHandler
-                0x08000708                DCMI_IRQHandler
-                0x08000708                CAN2_RX0_IRQHandler
-                0x08000708                DMA2_Stream3_IRQHandler
-                0x08000708                SAI2_IRQHandler
-                0x08000708                USART6_IRQHandler
-                0x08000708                USART3_IRQHandler
-                0x08000708                CAN1_RX1_IRQHandler
-                0x08000708                UART5_IRQHandler
-                0x08000708                DMA2_Stream0_IRQHandler
-                0x08000708                TIM4_IRQHandler
-                0x08000708                QUADSPI_IRQHandler
-                0x08000708                I2C1_EV_IRQHandler
-                0x08000708                DMA1_Stream6_IRQHandler
-                0x08000708                DMA1_Stream1_IRQHandler
-                0x08000708                UART4_IRQHandler
-                0x08000708                TIM3_IRQHandler
-                0x08000708                RCC_IRQHandler
-                0x08000708                TIM8_BRK_TIM12_IRQHandler
-                0x08000708                Default_Handler
-                0x08000708                CEC_IRQHandler
-                0x08000708                EXTI15_10_IRQHandler
-                0x08000708                ADC_IRQHandler
-                0x08000708                DMA1_Stream7_IRQHandler
-                0x08000708                TIM7_IRQHandler
-                0x08000708                CAN2_TX_IRQHandler
-                0x08000708                TIM5_IRQHandler
-                0x08000708                DMA2_Stream7_IRQHandler
-                0x08000708                I2C3_EV_IRQHandler
-                0x08000708                EXTI9_5_IRQHandler
-                0x08000708                RTC_WKUP_IRQHandler
-                0x08000708                SPDIF_RX_IRQHandler
-                0x08000708                SPI2_IRQHandler
-                0x08000708                OTG_HS_EP1_IN_IRQHandler
-                0x08000708                MemManage_Handler
-                0x08000708                DMA1_Stream0_IRQHandler
-                0x08000708                CAN1_TX_IRQHandler
-                0x08000708                SVC_Handler
-                0x08000708                FMPI2C1_ER_IRQHandler
-                0x08000708                EXTI4_IRQHandler
-                0x08000708                OTG_HS_EP1_OUT_IRQHandler
-                0x08000708                WWDG_IRQHandler
-                0x08000708                TIM2_IRQHandler
-                0x08000708                OTG_FS_WKUP_IRQHandler
-                0x08000708                TIM1_TRG_COM_TIM11_IRQHandler
-                0x08000708                OTG_HS_IRQHandler
-                0x08000708                EXTI1_IRQHandler
-                0x08000708                I2C2_ER_IRQHandler
-                0x08000708                DMA2_Stream1_IRQHandler
-                0x08000708                CAN1_SCE_IRQHandler
-                0x08000708                FLASH_IRQHandler
-                0x08000708                DMA2_Stream4_IRQHandler
-                0x08000708                BusFault_Handler
-                0x08000708                USART1_IRQHandler
-                0x08000708                OTG_FS_IRQHandler
-                0x08000708                SPI3_IRQHandler
-                0x08000708                DMA1_Stream4_IRQHandler
-                0x08000708                I2C1_ER_IRQHandler
-                0x08000708                FMC_IRQHandler
-                0x08000708                DMA2_Stream6_IRQHandler
-                0x08000708                SAI1_IRQHandler
-                0x08000708                DMA1_Stream3_IRQHandler
+                0x0800098c        0x2 build/startup.o
+                0x0800098c                RTC_Alarm_IRQHandler
+                0x0800098c                EXTI2_IRQHandler
+                0x0800098c                TIM8_CC_IRQHandler
+                0x0800098c                DebugMon_Handler
+                0x0800098c                FMPI2C1_EV_IRQHandler
+                0x0800098c                SPI4_IRQHandler
+                0x0800098c                TIM1_CC_IRQHandler
+                0x0800098c                DMA2_Stream5_IRQHandler
+                0x0800098c                HardFault_Handler
+                0x0800098c                DMA1_Stream5_IRQHandler
+                0x0800098c                SysTick_Handler
+                0x0800098c                PVD_IRQHandler
+                0x0800098c                SDIO_IRQHandler
+                0x0800098c                TAMP_STAMP_IRQHandler
+                0x0800098c                PendSV_Handler
+                0x0800098c                NMI_Handler
+                0x0800098c                CAN2_RX1_IRQHandler
+                0x0800098c                EXTI3_IRQHandler
+                0x0800098c                TIM8_TRG_COM_TIM14_IRQHandler
+                0x0800098c                TIM1_UP_TIM10_IRQHandler
+                0x0800098c                TIM8_UP_TIM13_IRQHandler
+                0x0800098c                I2C3_ER_IRQHandler
+                0x0800098c                EXTI0_IRQHandler
+                0x0800098c                I2C2_EV_IRQHandler
+                0x0800098c                DMA1_Stream2_IRQHandler
+                0x0800098c                CAN1_RX0_IRQHandler
+                0x0800098c                FPU_IRQHandler
+                0x0800098c                OTG_HS_WKUP_IRQHandler
+                0x0800098c                UsageFault_Handler
+                0x0800098c                CAN2_SCE_IRQHandler
+                0x0800098c                DMA2_Stream2_IRQHandler
+                0x0800098c                SPI1_IRQHandler
+                0x0800098c                TIM6_DAC_IRQHandler
+                0x0800098c                TIM1_BRK_TIM9_IRQHandler
+                0x0800098c                DCMI_IRQHandler
+                0x0800098c                CAN2_RX0_IRQHandler
+                0x0800098c                DMA2_Stream3_IRQHandler
+                0x0800098c                SAI2_IRQHandler
+                0x0800098c                USART6_IRQHandler
+                0x0800098c                USART3_IRQHandler
+                0x0800098c                CAN1_RX1_IRQHandler
+                0x0800098c                UART5_IRQHandler
+                0x0800098c                DMA2_Stream0_IRQHandler
+                0x0800098c                TIM4_IRQHandler
+                0x0800098c                QUADSPI_IRQHandler
+                0x0800098c                I2C1_EV_IRQHandler
+                0x0800098c                DMA1_Stream6_IRQHandler
+                0x0800098c                DMA1_Stream1_IRQHandler
+                0x0800098c                TIM3_IRQHandler
+                0x0800098c                RCC_IRQHandler
+                0x0800098c                TIM8_BRK_TIM12_IRQHandler
+                0x0800098c                Default_Handler
+                0x0800098c                CEC_IRQHandler
+                0x0800098c                EXTI15_10_IRQHandler
+                0x0800098c                ADC_IRQHandler
+                0x0800098c                DMA1_Stream7_IRQHandler
+                0x0800098c                TIM7_IRQHandler
+                0x0800098c                CAN2_TX_IRQHandler
+                0x0800098c                TIM5_IRQHandler
+                0x0800098c                DMA2_Stream7_IRQHandler
+                0x0800098c                I2C3_EV_IRQHandler
+                0x0800098c                EXTI9_5_IRQHandler
+                0x0800098c                RTC_WKUP_IRQHandler
+                0x0800098c                SPDIF_RX_IRQHandler
+                0x0800098c                SPI2_IRQHandler
+                0x0800098c                OTG_HS_EP1_IN_IRQHandler
+                0x0800098c                MemManage_Handler
+                0x0800098c                DMA1_Stream0_IRQHandler
+                0x0800098c                CAN1_TX_IRQHandler
+                0x0800098c                SVC_Handler
+                0x0800098c                FMPI2C1_ER_IRQHandler
+                0x0800098c                EXTI4_IRQHandler
+                0x0800098c                OTG_HS_EP1_OUT_IRQHandler
+                0x0800098c                WWDG_IRQHandler
+                0x0800098c                TIM2_IRQHandler
+                0x0800098c                OTG_FS_WKUP_IRQHandler
+                0x0800098c                TIM1_TRG_COM_TIM11_IRQHandler
+                0x0800098c                OTG_HS_IRQHandler
+                0x0800098c                EXTI1_IRQHandler
+                0x0800098c                USART2_IRQHandler
+                0x0800098c                I2C2_ER_IRQHandler
+                0x0800098c                DMA2_Stream1_IRQHandler
+                0x0800098c                CAN1_SCE_IRQHandler
+                0x0800098c                FLASH_IRQHandler
+                0x0800098c                DMA2_Stream4_IRQHandler
+                0x0800098c                BusFault_Handler
+                0x0800098c                USART1_IRQHandler
+                0x0800098c                OTG_FS_IRQHandler
+                0x0800098c                SPI3_IRQHandler
+                0x0800098c                DMA1_Stream4_IRQHandler
+                0x0800098c                I2C1_ER_IRQHandler
+                0x0800098c                FMC_IRQHandler
+                0x0800098c                DMA2_Stream6_IRQHandler
+                0x0800098c                SAI1_IRQHandler
+                0x0800098c                DMA1_Stream3_IRQHandler
+ .text.strncmp  0x0800098e       0x24 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)
+                0x0800098e                strncmp
  *(.rodata)
+ *fill*         0x080009b2        0x2 
+ .rodata        0x080009b4       0x4a build/main.o
+ *fill*         0x080009fe        0x2 
+ .rodata        0x08000a00       0x2f build/nmea_parser.o
  *(.rodata*)
-                0x0800070c                        . = ALIGN (0x4)
- *fill*         0x0800070a        0x2 
-                0x0800070c                        _etext = .
-                0x08000714                        _sidata = LOADADDR (.data)
+                0x08000a30                        . = ALIGN (0x4)
+ *fill*         0x08000a2f        0x1 
+                0x08000a30                        _etext = .
+                0x08000a38                        _sidata = LOADADDR (.data)
 
-.glue_7         0x0800070c        0x0
- .glue_7        0x0800070c        0x0 linker stubs
+.glue_7         0x08000a30        0x0
+ .glue_7        0x08000a30        0x0 linker stubs
 
-.glue_7t        0x0800070c        0x0
- .glue_7t       0x0800070c        0x0 linker stubs
+.glue_7t        0x08000a30        0x0
+ .glue_7t       0x08000a30        0x0 linker stubs
 
-.vfp11_veneer   0x0800070c        0x0
- .vfp11_veneer  0x0800070c        0x0 linker stubs
+.vfp11_veneer   0x08000a30        0x0
+ .vfp11_veneer  0x08000a30        0x0 linker stubs
 
-.v4_bx          0x0800070c        0x0
- .v4_bx         0x0800070c        0x0 linker stubs
+.v4_bx          0x08000a30        0x0
+ .v4_bx         0x08000a30        0x0 linker stubs
 
-.init           0x0800070c        0x4
- .init          0x0800070c        0x4 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/thumb/v7e-m+fp/hard/crti.o
-                0x0800070c                _init
+.init           0x08000a30        0x4
+ .init          0x08000a30        0x4 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/thumb/v7e-m+fp/hard/crti.o
+                0x08000a30                _init
 
-.fini           0x08000710        0x4
- .fini          0x08000710        0x4 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/thumb/v7e-m+fp/hard/crti.o
-                0x08000710                _fini
+.fini           0x08000a34        0x4
+ .fini          0x08000a34        0x4 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/thumb/v7e-m+fp/hard/crti.o
+                0x08000a34                _fini
 
-.iplt           0x08000714        0x0
- .iplt          0x08000714        0x0 build/main.o
+.iplt           0x08000a38        0x0
+ .iplt          0x08000a38        0x0 build/main.o
 
-.rel.dyn        0x08000714        0x0
- .rel.iplt      0x08000714        0x0 build/main.o
+.rel.dyn        0x08000a38        0x0
+ .rel.iplt      0x08000a38        0x0 build/main.o
 
-.data           0x20000000        0x0 load address 0x08000714
+.data           0x20000000        0x0 load address 0x08000a38
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _sdata = .
  *(.data)
@@ -786,10 +823,10 @@ LOAD C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-non
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _edata = .
 
-.igot.plt       0x20000000        0x0 load address 0x08000714
+.igot.plt       0x20000000        0x0 load address 0x08000a38
  .igot.plt      0x20000000        0x0 build/main.o
 
-.bss            0x20000000      0x40c load address 0x08000714
+.bss            0x20000000      0x490 load address 0x08000a38
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _sbss = .
  *(.bss)
@@ -799,19 +836,23 @@ LOAD C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-non
  .bss.s_tail    0x20000202        0x2 build/event_queue.o
  .bss.s_rx_buffer
                 0x20000204      0x100 build/uart_driver.o
- .bss.s_rx_head
-                0x20000304        0x2 build/uart_driver.o
  .bss.s_rx_tail
-                0x20000306        0x2 build/uart_driver.o
+                0x20000304        0x2 build/uart_driver.o
+ *fill*         0x20000306        0x2 
  .bss.s_tx_buffer
                 0x20000308      0x100 build/uart_driver.o
  .bss.s_tx_head
                 0x20000408        0x2 build/uart_driver.o
  .bss.s_tx_tail
                 0x2000040a        0x2 build/uart_driver.o
+ .bss.frame_buffer
+                0x2000040c       0x80 build/uart_driver.o
+ .bss.frame_index
+                0x2000048c        0x2 build/uart_driver.o
  *(COMMON)
-                0x2000040c                        . = ALIGN (0x4)
-                0x2000040c                        _ebss = .
+                0x20000490                        . = ALIGN (0x4)
+ *fill*         0x2000048e        0x2 
+                0x20000490                        _ebss = .
 OUTPUT(build/telematics_gateway.elf elf32-littlearm)
 LOAD linker stubs
 
@@ -824,18 +865,24 @@ LOAD linker stubs
  .ARM.attributes
                 0x00000056       0x34 build/event_queue.o
  .ARM.attributes
-                0x0000008a       0x34 build/uart_driver.o
+                0x0000008a       0x34 build/nmea_parser.o
  .ARM.attributes
-                0x000000be       0x34 build/dma_driver.o
+                0x000000be       0x34 build/uart_driver.o
  .ARM.attributes
-                0x000000f2       0x34 build/system_stm32f4xx.o
+                0x000000f2       0x34 build/dma_driver.o
  .ARM.attributes
-                0x00000126       0x21 build/startup.o
+                0x00000126       0x34 build/system_stm32f4xx.o
+ .ARM.attributes
+                0x0000015a       0x21 build/startup.o
+ .ARM.attributes
+                0x0000017b       0x34 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)
 
 .comment        0x00000000       0x45
  .comment       0x00000000       0x45 build/main.o
                                  0x46 (size before relaxing)
  .comment       0x00000045        0x0 build/event_queue.o
+                                 0x46 (size before relaxing)
+ .comment       0x00000045        0x0 build/nmea_parser.o
                                  0x46 (size before relaxing)
  .comment       0x00000045        0x0 build/uart_driver.o
                                  0x46 (size before relaxing)
@@ -844,105 +891,119 @@ LOAD linker stubs
  .comment       0x00000045        0x0 build/system_stm32f4xx.o
                                  0x46 (size before relaxing)
 
-.debug_info     0x00000000     0x1c30
- .debug_info    0x00000000      0x48b build/main.o
- .debug_info    0x0000048b      0x337 build/event_queue.o
- .debug_info    0x000007c2      0xc70 build/uart_driver.o
- .debug_info    0x00001432      0x38c build/dma_driver.o
- .debug_info    0x000017be      0x472 build/system_stm32f4xx.o
+.debug_info     0x00000000     0x1ebf
+ .debug_info    0x00000000      0x5a8 build/main.o
+ .debug_info    0x000005a8      0x337 build/event_queue.o
+ .debug_info    0x000008df      0x115 build/nmea_parser.o
+ .debug_info    0x000009f4      0xccd build/uart_driver.o
+ .debug_info    0x000016c1      0x38c build/dma_driver.o
+ .debug_info    0x00001a4d      0x472 build/system_stm32f4xx.o
 
-.debug_abbrev   0x00000000      0x6e6
- .debug_abbrev  0x00000000      0x154 build/main.o
- .debug_abbrev  0x00000154      0x19d build/event_queue.o
- .debug_abbrev  0x000002f1      0x251 build/uart_driver.o
- .debug_abbrev  0x00000542       0xee build/dma_driver.o
- .debug_abbrev  0x00000630       0xb6 build/system_stm32f4xx.o
+.debug_abbrev   0x00000000      0x86b
+ .debug_abbrev  0x00000000      0x1de build/main.o
+ .debug_abbrev  0x000001de      0x19d build/event_queue.o
+ .debug_abbrev  0x0000037b       0xb1 build/nmea_parser.o
+ .debug_abbrev  0x0000042c      0x29b build/uart_driver.o
+ .debug_abbrev  0x000006c7       0xee build/dma_driver.o
+ .debug_abbrev  0x000007b5       0xb6 build/system_stm32f4xx.o
 
-.debug_aranges  0x00000000       0xf0
+.debug_aranges  0x00000000      0x128
  .debug_aranges
-                0x00000000       0x30 build/main.o
+                0x00000000       0x38 build/main.o
  .debug_aranges
-                0x00000030       0x30 build/event_queue.o
+                0x00000038       0x30 build/event_queue.o
  .debug_aranges
-                0x00000060       0x48 build/uart_driver.o
+                0x00000068       0x20 build/nmea_parser.o
  .debug_aranges
-                0x000000a8       0x28 build/dma_driver.o
+                0x00000088       0x58 build/uart_driver.o
  .debug_aranges
-                0x000000d0       0x20 build/system_stm32f4xx.o
+                0x000000e0       0x28 build/dma_driver.o
+ .debug_aranges
+                0x00000108       0x20 build/system_stm32f4xx.o
 
 .debug_rnglists
-                0x00000000       0xa1
+                0x00000000       0xc7
  .debug_rnglists
-                0x00000000       0x20 build/main.o
+                0x00000000       0x26 build/main.o
  .debug_rnglists
-                0x00000020       0x21 build/event_queue.o
+                0x00000026       0x21 build/event_queue.o
  .debug_rnglists
-                0x00000041       0x34 build/uart_driver.o
+                0x00000047       0x14 build/nmea_parser.o
  .debug_rnglists
-                0x00000075       0x19 build/dma_driver.o
+                0x0000005b       0x3f build/uart_driver.o
  .debug_rnglists
-                0x0000008e       0x13 build/system_stm32f4xx.o
+                0x0000009a       0x1a build/dma_driver.o
+ .debug_rnglists
+                0x000000b4       0x13 build/system_stm32f4xx.o
 
-.debug_macro    0x00000000    0x19875
- .debug_macro   0x00000000      0x19c build/main.o
- .debug_macro   0x0000019c      0xaea build/main.o
- .debug_macro   0x00000c86       0x2e build/main.o
- .debug_macro   0x00000cb4       0x28 build/main.o
- .debug_macro   0x00000cdc       0x22 build/main.o
- .debug_macro   0x00000cfe       0x56 build/main.o
- .debug_macro   0x00000d54       0x51 build/main.o
- .debug_macro   0x00000da5      0x103 build/main.o
- .debug_macro   0x00000ea8       0x6a build/main.o
- .debug_macro   0x00000f12      0x1df build/main.o
- .debug_macro   0x000010f1       0x1c build/main.o
- .debug_macro   0x0000110d       0x22 build/main.o
- .debug_macro   0x0000112f      0x107 build/main.o
- .debug_macro   0x00001236     0x1057 build/main.o
- .debug_macro   0x0000228d      0x11f build/main.o
- .debug_macro   0x000023ac    0x1675e build/main.o
- .debug_macro   0x00018b0a       0x6d build/main.o
- .debug_macro   0x00018b77       0x22 build/main.o
- .debug_macro   0x00018b99       0x7b build/main.o
- .debug_macro   0x00018c14       0x2a build/main.o
- .debug_macro   0x00018c3e       0x3c build/main.o
- .debug_macro   0x00018c7a       0x34 build/main.o
- .debug_macro   0x00018cae      0x190 build/main.o
- .debug_macro   0x00018e3e      0x364 build/main.o
- .debug_macro   0x000191a2       0x16 build/main.o
- .debug_macro   0x000191b8       0x4a build/main.o
- .debug_macro   0x00019202       0x34 build/main.o
- .debug_macro   0x00019236       0x10 build/main.o
- .debug_macro   0x00019246       0x58 build/main.o
- .debug_macro   0x0001929e      0x1e5 build/main.o
- .debug_macro   0x00019483       0x10 build/main.o
- .debug_macro   0x00019493       0x3c build/main.o
- .debug_macro   0x000194cf       0xf0 build/event_queue.o
- .debug_macro   0x000195bf      0x110 build/uart_driver.o
- .debug_macro   0x000196cf       0xd8 build/dma_driver.o
- .debug_macro   0x000197a7       0xce build/system_stm32f4xx.o
+.debug_macro    0x00000000    0x1995c
+ .debug_macro   0x00000000       0xef build/main.o
+ .debug_macro   0x000000ef      0xaea build/main.o
+ .debug_macro   0x00000bd9       0x22 build/main.o
+ .debug_macro   0x00000bfb       0x56 build/main.o
+ .debug_macro   0x00000c51       0x51 build/main.o
+ .debug_macro   0x00000ca2      0x103 build/main.o
+ .debug_macro   0x00000da5       0x6a build/main.o
+ .debug_macro   0x00000e0f      0x1df build/main.o
+ .debug_macro   0x00000fee       0x22 build/main.o
+ .debug_macro   0x00001010       0x2e build/main.o
+ .debug_macro   0x0000103e       0x28 build/main.o
+ .debug_macro   0x00001066       0x1c build/main.o
+ .debug_macro   0x00001082       0x22 build/main.o
+ .debug_macro   0x000010a4      0x107 build/main.o
+ .debug_macro   0x000011ab     0x1057 build/main.o
+ .debug_macro   0x00002202      0x11f build/main.o
+ .debug_macro   0x00002321    0x1675e build/main.o
+ .debug_macro   0x00018a7f       0x6d build/main.o
+ .debug_macro   0x00018aec       0xf0 build/event_queue.o
+ .debug_macro   0x00018bdc      0x190 build/event_queue.o
+ .debug_macro   0x00018d6c       0xe7 build/nmea_parser.o
+ .debug_macro   0x00018e53       0x75 build/nmea_parser.o
+ .debug_macro   0x00018ec8       0x2a build/nmea_parser.o
+ .debug_macro   0x00018ef2       0x5c build/nmea_parser.o
+ .debug_macro   0x00018f4e       0x3c build/nmea_parser.o
+ .debug_macro   0x00018f8a       0x34 build/nmea_parser.o
+ .debug_macro   0x00018fbe       0x57 build/nmea_parser.o
+ .debug_macro   0x00019015      0x364 build/nmea_parser.o
+ .debug_macro   0x00019379       0x16 build/nmea_parser.o
+ .debug_macro   0x0001938f       0x4a build/nmea_parser.o
+ .debug_macro   0x000193d9       0x34 build/nmea_parser.o
+ .debug_macro   0x0001940d       0x10 build/nmea_parser.o
+ .debug_macro   0x0001941d       0x58 build/nmea_parser.o
+ .debug_macro   0x00019475      0x1e5 build/nmea_parser.o
+ .debug_macro   0x0001965a       0x10 build/nmea_parser.o
+ .debug_macro   0x0001966a       0x3c build/nmea_parser.o
+ .debug_macro   0x000196a6      0x110 build/uart_driver.o
+ .debug_macro   0x000197b6       0xd8 build/dma_driver.o
+ .debug_macro   0x0001988e       0xce build/system_stm32f4xx.o
 
-.debug_line     0x00000000     0x143e
- .debug_line    0x00000000      0x47a build/main.o
- .debug_line    0x0000047a      0x422 build/event_queue.o
- .debug_line    0x0000089c      0x587 build/uart_driver.o
- .debug_line    0x00000e23      0x346 build/dma_driver.o
- .debug_line    0x00001169      0x2d5 build/system_stm32f4xx.o
+.debug_line     0x00000000     0x16d6
+ .debug_line    0x00000000      0x417 build/main.o
+ .debug_line    0x00000417      0x422 build/event_queue.o
+ .debug_line    0x00000839      0x2da build/nmea_parser.o
+ .debug_line    0x00000b13      0x5a2 build/uart_driver.o
+ .debug_line    0x000010b5      0x34c build/dma_driver.o
+ .debug_line    0x00001401      0x2d5 build/system_stm32f4xx.o
 
-.debug_str      0x00000000    0x8ec1e
- .debug_str     0x00000000    0x8ec1e build/main.o
-                              0x8e4a6 (size before relaxing)
- .debug_str     0x0008ec1e        0x0 build/event_queue.o
+.debug_str      0x00000000    0x8ec7c
+ .debug_str     0x00000000    0x8ec7c build/main.o
+                              0x8b6db (size before relaxing)
+ .debug_str     0x0008ec7c        0x0 build/event_queue.o
                               0x8b87c (size before relaxing)
- .debug_str     0x0008ec1e        0x0 build/uart_driver.o
-                              0x8c0e6 (size before relaxing)
- .debug_str     0x0008ec1e        0x0 build/dma_driver.o
-                              0x8b4fa (size before relaxing)
- .debug_str     0x0008ec1e        0x0 build/system_stm32f4xx.o
+ .debug_str     0x0008ec7c        0x0 build/nmea_parser.o
+                               0x6138 (size before relaxing)
+ .debug_str     0x0008ec7c        0x0 build/uart_driver.o
+                              0x8c112 (size before relaxing)
+ .debug_str     0x0008ec7c        0x0 build/dma_driver.o
+                              0x8b4f9 (size before relaxing)
+ .debug_str     0x0008ec7c        0x0 build/system_stm32f4xx.o
                               0x8b4b0 (size before relaxing)
 
-.debug_frame    0x00000000      0x26c
- .debug_frame   0x00000000       0x70 build/main.o
- .debug_frame   0x00000070       0x80 build/event_queue.o
- .debug_frame   0x000000f0       0xf4 build/uart_driver.o
- .debug_frame   0x000001e4       0x58 build/dma_driver.o
- .debug_frame   0x0000023c       0x30 build/system_stm32f4xx.o
+.debug_frame    0x00000000      0x334
+ .debug_frame   0x00000000       0x9c build/main.o
+ .debug_frame   0x0000009c       0x80 build/event_queue.o
+ .debug_frame   0x0000011c       0x34 build/nmea_parser.o
+ .debug_frame   0x00000150      0x134 build/uart_driver.o
+ .debug_frame   0x00000284       0x58 build/dma_driver.o
+ .debug_frame   0x000002dc       0x30 build/system_stm32f4xx.o
+ .debug_frame   0x0000030c       0x28 C:/Users/USER/scoop/apps/gcc-arm-none-eabi/15.2.rel1/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/hard\libc_nano.a(libc_a-strncmp.o)

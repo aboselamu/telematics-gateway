@@ -19,9 +19,9 @@ ARCH_FLAGS = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 # --- Include paths ---
 INCLUDES = -Iapp/inc \
            -Imiddleware/event_queue/inc \
+           -Imiddleware/protocol/inc \
            -Idrivers/peripheral/uart \
-		   -Idrivers/peripheral/dma/inc \
-		   -Idrivers/peripheral/dma/src \
+           -Idrivers/peripheral/dma/inc \
            -Iplatform/inc \
            -Ithird_party/cmsis/Core/Include \
            -Ithird_party/cmsis/Device/STSTM32F4xx/Include
@@ -38,6 +38,7 @@ LDFLAGS = $(ARCH_FLAGS) -Tlinker/STM32F446RETX_FLASH.ld \
 # --- Object Files ---
 C_OBJS = $(BUILD_DIR)/main.o \
          $(BUILD_DIR)/event_queue.o \
+         $(BUILD_DIR)/nmea_parser.o \
          $(BUILD_DIR)/uart_driver.o \
          $(BUILD_DIR)/dma_driver.o \
          $(BUILD_DIR)/system_stm32f4xx.o
@@ -62,6 +63,10 @@ $(BUILD_DIR)/main.o: app/src/main.c
 
 $(BUILD_DIR)/event_queue.o: middleware/event_queue/src/event_queue.c
 	@echo "  CC  middleware/event_queue/src/event_queue.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/nmea_parser.o: middleware/protocol/src/nmea_parser.c
+	@echo "  CC  middleware/protocol/src/nmea_parser.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/uart_driver.o: drivers/peripheral/uart/uart_driver.c
