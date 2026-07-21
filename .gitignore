@@ -12,3 +12,9 @@
 # Precompiled Headers
 *.gch
 *.pch
+# Build directories and artifacts
+build/
+*.bin
+*.elf
+*.map
+*.d

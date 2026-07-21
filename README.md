@@ -1,60 +1,250 @@
 # Telematics Gateway
 
-**A bare-metal, event-driven embedded gateway engineered for high-throughput telematics data routing.** Built on the STM32F4 architecture, this project focuses on non-blocking peripheral drivers, lock-free middleware, and strict Hardware-in-the-Loop (HIL) verification to ensure enterprise-grade stability in automotive and industrial environments.
+> **A production-oriented, bare-metal embedded gateway built on the
+> STM32F4 platform, demonstrating scalable firmware architecture,
+> hardware abstraction, defensive driver design, and event-driven
+> communication for automotive and industrial telematics systems.**
 
----
+The project is developed incrementally using a structured
+architecture-first methodology. Every subsystem progresses through
+requirements, architecture, implementation, verification, and
+Hardware-in-the-Loop (HIL) validation before integration.
 
-## 🏗️ System Architecture & Project Status
+------------------------------------------------------------------------
 
-### Phase 1: Event Queue Framework
-**Status:** Completed & Verified
+# Project Objectives
 
-* **Architecture:** Engineered a robust, lock-free middleware layer to decouple hardware interrupts (ISRs) from the main application loop. Implemented custom zero-copy event envelopes to pass state data without memory fragmentation.
-* **Verification:** Fully unit-tested the circular buffer wrap-around math and queue saturation logic using a desktop-based Python testing environment.
+This repository is not intended to demonstrate isolated peripheral
+examples.
 
-### Phase 2: Production-Grade UART Driver
-**Status:** Completed & Verified
+Instead, it focuses on designing a reusable firmware architecture
+capable of scaling from a single UART interface into a complete
+multi-protocol telematics gateway supporting:
 
-* **Architecture:** Engineered a non-blocking, interrupt-driven USART2 module. Implemented a dual circular ring buffer (256-byte TX/RX) utilizing a **decoupled cursor reading strategy** to eliminate ISR race conditions. Application layer extraction is managed via a lock-free claim-ticket notification system, completely isolating the main loop from hardware timing constraints.
-* **Verification:** Passed a 500-cycle Hardware-in-the-Loop (HIL) rapid-fire stress test using a custom Python PySerial desktop script. 
-* **Result:** Zero dropped frames, zero buffer overruns, and successful atomic state synchronization maintained under heavy, continuous physical load at 115200 baud.
+-   UART
+-   DMA
+-   I²C
+-   SPI
+-   CAN Bus
+-   External Sensors
+-   LTE Modem
+-   GPS Receiver
+-   Cloud Connectivity
 
----
+while maintaining deterministic execution, predictable memory usage, and
+complete separation between hardware and application logic.
 
-## 📂 Project Structure 
+------------------------------------------------------------------------
 
-```text
+# Firmware Design Principles
+
+## Event-Driven Architecture
+
+Hardware peripherals never execute application logic directly.
+
+``` text
+Peripherals
+      │
+      ▼
+Interrupt Service Routines
+      │
+      ▼
+Event Queue
+      │
+      ▼
+Dispatcher
+      │
+      ▼
+Application Services
+```
+
+## Memory Ownership
+
+DMA buffers belong exclusively to the transport layer.
+
+Application code never parses volatile DMA memory.
+
+``` text
+DMA Circular Buffer
+        │
+        ▼
+Frame Builder
+        │
+        ▼
+Static Frame Buffer
+        │
+        ▼
+Event Queue
+        │
+        ▼
+Protocol Parser
+```
+
+## Hardware Abstraction
+
+Application code communicates only through driver interfaces.
+
+``` text
+Application
+    │
+    ▼
+Driver API
+    │
+    ▼
+Driver Services
+    │
+    ▼
+Hardware Primitives
+    │
+    ▼
+STM32 Registers
+```
+
+## Defensive Programming
+
+-   Parameter validation
+-   Driver state management
+-   Software timeout protection
+-   Centralized error detection
+-   Bus recovery mechanisms
+-   Static memory allocation
+-   No dynamic memory allocation
+
+------------------------------------------------------------------------
+
+# Development Progress
+
+## Phase 0 --- Project Foundation
+
+**Status:** ✅ Completed
+
+Repository structure, architecture, Git workflow, Jira integration and
+coding conventions established.
+
+## Phase 1 --- Event Queue Framework
+
+**Status:** ✅ Completed & Verified
+
+-   Lock-free circular queue
+-   Static memory allocation
+-   Zero-copy event envelopes
+-   ISR-safe producer model
+
+Verified through desktop testing of queue wrap-around, saturation and
+boundary conditions.
+
+## Phase 2 --- Production UART Driver
+
+**Status:** ✅ Completed & Hardware Verified
+
+-   Interrupt-driven UART
+-   Dual circular ring buffers
+-   Non-blocking API
+-   Event-driven notifications
+
+Verified with Hardware-in-the-Loop testing:
+
+-   STM32F446RE
+-   Python + PySerial
+-   500 stress cycles
+-   Zero dropped frames
+-   Zero buffer overruns
+
+## Phase 3 --- DMA Integration & Data Pipeline Architecture
+
+**Status:** 🚧 In Progress
+
+Current architectural milestones:
+
+-   DMA-driven UART reception
+-   Memory Ownership architecture
+-   Frame Builder abstraction
+-   Static frame buffers
+-   Zero-copy event notifications
+-   Production-grade I²C driver foundation
+
+------------------------------------------------------------------------
+
+# Project Structure
+
+``` text
 telematics-gateway/
 ├── app/
-│   └── main.c                 # Application entry point and event dispatcher
 ├── middleware/
-│   ├── event_queue.h          # Lock-free event queue public APIs
-│   └── event_queue.c          # Event queue implementation
+│   ├── event_queue.h
+│   └── event_queue.c
 ├── drivers/
-│   ├── uart_driver.h          # Hardware-abstracted UART APIs
-│   └── uart_driver.c          # Interrupt-driven STM32F4 USART2 implementation
-└── tests/
-    ├── unit/                  # Desktop-based C unit tests
-    └── hil/                   
-        └── test_uart_hil.py   # Python PySerial automated hardware stress tests
-
+│   ├── uart_driver.*
+│   ├── dma_driver.*
+│   └── i2c_driver.*
+├── tests/
+│   ├── unit/
+│   └── hil/
+└── docs/
 ```
----
-## 🚀  Development Roadmap
-Future phases are actively managed via Jira sprints, progressing toward a fully integrated cloud-connected gateway:
 
-[x] Phase 0 & 1: Project Architecture & Event Queue Framework
+------------------------------------------------------------------------
 
-[x] Phase 2: Production-Grade UART Drivers
+# Engineering Workflow
 
-[ ] Phase 3: Direct Memory Access (DMA) Integration
+``` text
+Requirements
+      │
+      ▼
+Architecture
+      │
+      ▼
+Public API
+      │
+      ▼
+Driver Context
+      │
+      ▼
+Implementation
+      │
+      ▼
+Unit Verification
+      │
+      ▼
+Hardware-in-the-Loop Testing
+      │
+      ▼
+Production Integration
+```
 
-[ ] Phases 4 - 6: SPI Architecture & CAN Bus Communication
+------------------------------------------------------------------------
 
-[ ] Phases 7 - 11: Services Layer, RTOS Migration, & Cloud Gateway Integration
+# Development Roadmap
 
-Developed as a demonstration of robust embedded C architecture, defensive programming, and automated hardware testing methodologies.
+  Phase                                   Status
+  --------------------------------------- --------
+  Phase 0 --- Project Foundation          ✅
+  Phase 1 --- Event Queue Framework       ✅
+  Phase 2 --- UART Driver                 ✅
+  Phase 3 --- DMA & Driver Architecture   🚧
+  Phase 4 --- SPI Driver                  ⏳
+  Phase 5 --- CAN Driver                  ⏳
+  Phase 6 --- I²C Integration             ⏳
+  Phase 7 --- Sensor Services             ⏳
+  Phase 8 --- Telematics Services         ⏳
+  Phase 9 --- RTOS Migration              ⏳
+  Phase 10 --- Cloud Gateway              ⏳
+  Phase 11 --- Production Optimization    ⏳
 
----
+------------------------------------------------------------------------
 
-## This project is managed using Jira via the official GitHub-Jira integration. Commits, feature branches, and pull requests are linked to structured Jira tickets to maintain a strict, agile software development lifecycle.
+# Project Management
+
+Development is managed using **Jira** integrated with **GitHub**.
+
+Every feature follows:
+
+-   Requirements
+-   Design
+-   Implementation
+-   Code Review
+-   Hardware Validation
+-   Completion
+
+Branches, commits and pull requests are linked to Jira issues to provide
+end-to-end traceability throughout the firmware development lifecycle.
