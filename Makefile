@@ -19,7 +19,8 @@ ARCH_FLAGS = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 # --- Include paths ---
 INCLUDES = -Iapp/inc \
            -Imiddleware/event_queue/inc \
-           -Imiddleware/protocol/inc \
+           -Imiddleware/protocol/gps_nmea/inc \
+		   -Imiddleware/frame_manager/inc \
            -Idrivers/peripheral/uart \
            -Idrivers/peripheral/dma/inc \
            -Iplatform/inc \
@@ -39,9 +40,12 @@ LDFLAGS = $(ARCH_FLAGS) -Tlinker/STM32F446RETX_FLASH.ld \
 C_OBJS = $(BUILD_DIR)/main.o \
          $(BUILD_DIR)/event_queue.o \
          $(BUILD_DIR)/nmea_parser.o \
+		 $(BUILD_DIR)/gps_decoder.o \
+		 $(BUILD_DIR)/frame_manager.o \
          $(BUILD_DIR)/uart_driver.o \
          $(BUILD_DIR)/dma_driver.o \
          $(BUILD_DIR)/system_stm32f4xx.o
+
 
 ASM_OBJS = $(BUILD_DIR)/startup.o
 
@@ -65,8 +69,16 @@ $(BUILD_DIR)/event_queue.o: middleware/event_queue/src/event_queue.c
 	@echo "  CC  middleware/event_queue/src/event_queue.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/nmea_parser.o: middleware/protocol/src/nmea_parser.c
+$(BUILD_DIR)/nmea_parser.o: middleware/protocol/gps_nmea/src/nmea_parser.c
 	@echo "  CC  middleware/protocol/src/nmea_parser.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/gps_decoder.o: middleware/protocol/gps_nmea/src/gps_decoder.c
+	@echo "  CC  middleware/protocol/gps_nmea/src/gps_decoder.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+$(BUILD_DIR)/frame_manager.o: middleware/frame_manager/src/frame_manager.c
+	@echo "  CC  middleware/frame_manager/src/frame_manager.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/uart_driver.o: drivers/peripheral/uart/uart_driver.c

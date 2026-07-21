@@ -1,0 +1,178 @@
+i2c_driver.c
+
+├── Includes
+│
+├── Private Defines
+│
+├── Driver Context
+│
+├── Private Function Prototypes
+│
+├── Public Functions
+│     ├── i2c_init()
+│     ├── i2c_write()
+│     ├── i2c_read()
+│     └── i2c_write_read()
+│
+└── Private Helpers
+      ├── i2c_configure_timing()
+      ├── i2c_generate_start()
+      ├── i2c_send_address()
+      ├── i2c_send_byte()
+      └── i2c_generate_stop()
+      └── i2c_wait_sr1_flag()
+
+
+progress 
+✓ Architecture
+✓ Public API (.h)
+
+↓
+
+✓ Driver Context => s_state = I2C_STATE_RESET
+
+↓
+
+✓ i2c_init()
+
+↓
+
+✓ Generate START => i2c_generate_start()
+
+↓
+
+✓ Send Address => i2c_send_address()
+
+↓
+
+▶ Send Byte   ← CURRENT
+Requirements              ✓ 
+Architecture              ✓
+Public API                ✓
+Driver Context            ✓
+i2c_init()                ✓
+Generate START            ✓
+Send Address              ✓
+
+────────────── CURRENT ──────────────
+
+Send Byte                 ✓
+Generate STOP             ✓
+i2c_write()               ◻
+Read Transaction          ◻
+Write-Read Transaction    ◻
+Hardware Test             ◻
+
+================================================================
+using polling while loop vs polling helper function
+
+START                       START
+   ↓                          ↓
+while()                     wait_flag()
+                              ↓
+ADDRESS                     ADDRESS
+   ↓                          ↓
+while()                     wait_flag()
+                              ↓
+BYTE                        BYTE
+   ↓                          ↓  
+while()                     wait_flag()
+   ↓                          ↓
+STOP                        STOP
+   ↓                          ↓
+while()                     wait_flag()
+
+================================================================
+Principle: Single Responsibility
+
+Let's separate the responsibilities into two private helpers:
+
+i2c_wait_sr1_flag()
+  Responsible for
+    polling
+    timeout
+    classifying the error
+    returning status
+
+        │
+        ▼
+Read SR1 once
+        │
+        ├── Success → return OK
+        │
+        ├── AF?
+        │      │
+        │      ▼
+        │ clear_error_flags(sr1)
+        │ return NACK
+        │
+        ├── BERR?
+        │      │
+        │      ▼
+        │ clear_error_flags(sr1)
+        │ return BUS
+        │
+        └── Timeout
+
+---Detection happens in one place.
+---Recovery/Cleanup happens in another.
+---Future interrupt and DMA versions can reuse the cleanup function.
+================================================================
+Let public transaction APIs own recovery
+
+When we implement i2c_write(), the flow will be:
+
+START
+    ↓
+ADDRESS
+    ↓
+BYTE(S)
+    ↓
+STOP
+
+If any primitive returns an error:
+
+Primitive Error
+        ↓
+i2c_reset_bus()
+        ↓
+Return Error
+
+This keeps the layering clean:
+
+Public API
+    │
+    ├── Transaction orchestration
+    ├── Error recovery
+    └── State transitions
+
+Private Primitives
+    │
+    ├── Generate START
+    ├── Send Address
+    ├── Send Byte
+    └── Generate STOP
+
+Private Services
+    │
+    ├── Wait for SR1 flag
+    └── Clear error flags
+
+==================================================================
+wait_flag()
+
+↓
+
+detect error
+
+↓
+
+clear_error_flags()
+
+↓
+
+reset_bus()
+
+↓
+
+return error
