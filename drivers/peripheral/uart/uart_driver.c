@@ -8,6 +8,7 @@
 #include "uart_driver.h"
 #include "event_queue.h"
 #include "dma_driver.h" 
+#include "frame_manager.h"
 #include "stm32f4xx.h"  
 #include <stddef.h>
 
@@ -27,10 +28,6 @@ static uint8_t  s_tx_buffer[TX_BUFFER_SIZE];
 static volatile uint16_t s_tx_head = 0;
 static volatile uint16_t s_tx_tail = 0;
 
-// to copy from dma buffer, rx_buffer to middle fram buffer to prevent the data by dma on rx buffer before being processed
-
-static uint8_t frame_buffer[128];
-static uint16_t frame_index = 0;
 
 uart_status_t uart_init(const uart_config_t *p_config) {
     if (p_config == NULL) {
@@ -137,30 +134,8 @@ void uart_process_rx(void)
 
     while (uart_read(&byte) == UART_OK)
     {
-        // Prevent buffer overflow
-        if (frame_index < sizeof(frame_buffer) - 1)
-        {
-            frame_buffer[frame_index++] = byte;
-        }
-
-        // End of one GPS sentence, frame builder
-        if (byte == '\n')
-        {
-            frame_buffer[frame_index] = '\0';
-
-            event_t evt = {0};
-            evt.event_id = EVT_UART_FRAME_READY;
-
-            eventQueue_post(&evt);
-
-            frame_index = 0;
-        }
+        frame_manager_process_byte(byte);
     }
-}
-
-// for testing pupose only
-const char *uart_get_frame(void){
-    return (const char *)frame_buffer;
 }
 
 void UART4_IRQHandler(void) {

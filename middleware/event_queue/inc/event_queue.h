@@ -15,8 +15,8 @@ typedef enum {
 typedef struct {
     uint8_t  event_id;
     uint32_t timestamp;
-    uint32_t param1;
-    uint32_t param2;
+    uint32_t param1;    // frame_id
+    uint32_t param2;    // frame_length
 } event_t;
 
 event_status_t eventQueue_init(void);

@@ -1,6 +1,8 @@
 #include "uart_driver.h"
 #include "event_queue.h"
 #include "nmea_parser.h"
+#include "frame_manager.h"
+#include "gps_decoder.h"
 #include "stm32f4xx.h"  
 // #include <stddef.h>
 
@@ -36,64 +38,110 @@ void USART1_Write_String(const char *str)
 // ==========================================
 // Main Execution
 // ==========================================
-int main(void) {
-    USART1_Init(); // PC
+int main(void)
+{
+    USART1_Init();   // PC Debug UART
 
-    // Print a startup message so we know the STM32 is alive
     USART1_Write_String("\r\nDMA Ready\r\n");
+    
+    const char test_frame[] = "$GPRMC,131341.00,A,2612.28124,S,02800.48003,E,0.985,12.5,250626,,,A*6C";
 
-    eventQueue_init(); 
-    uart_config_t cfg = { .baud_rate = 9600 }; 
-    uart_init(&cfg); 
-    while (1) 
-    { 
-        uart_process_rx(); // check for me if a data is arrived on rx pin to rx buffer side
-        event_t evt; 
-        if (eventQueue_poll(&evt) == EVENT_QUEUE_OK){
-            
-            if (evt.event_id == EVT_UART_FRAME_READY){
+    gps_data_t gps;
 
-                const char *frame = uart_get_frame();
+    if (gps_decode_rmc(test_frame, &gps))
+    {
+        USART1_Write_String("\r\n===== TEST PARSE =====\r\n");
 
-                switch (nmea_parse(frame))
-                {
-                    case NMEA_GPRMC:
-                        USART1_Write_String("GPRMC\r\n");
-                        USART1_Write_String(frame);
-                        break;
+        USART1_Write_String("UTC: ");
+        USART1_Write_String(gps.utc_time);
+        USART1_Write_String("\r\n");
 
-                    case NMEA_GPGGA:
-                        USART1_Write_String("GPGGA\r\n");
-                        USART1_Write_String(frame);
-                        break;
+        USART1_Write_String("LAT: ");
+        USART1_Write_String(gps.latitude);
+        USART1_Write_Raw(' ');
+        USART1_Write_Raw(gps.latitude_dir);
+        USART1_Write_String("\r\n");
 
-                    case NMEA_GPGSV:
-                        USART1_Write_String("GPGSV\r\n");
-                        USART1_Write_String(frame);
-                        break;
+        USART1_Write_String("LON: ");
+        USART1_Write_String(gps.longitude);
+        USART1_Write_Raw(' ');
+        USART1_Write_Raw(gps.longitude_dir);
+        USART1_Write_String("\r\n");
 
-                    case NMEA_GPGSA:
-                        USART1_Write_String("GPGSA\r\n");
-                        USART1_Write_String(frame);
-                        break;
+        USART1_Write_String("SPD: ");
+        USART1_Write_String(gps.speed);
+        USART1_Write_String("\r\n");
 
-                    case NMEA_GPVTG:
-                        USART1_Write_String("GPVTG\r\n");
-                        USART1_Write_String(frame);
-                        break;
+        USART1_Write_String("FIX: ");
+        USART1_Write_String(gps.valid_fix ? "VALID" : "INVALID");
+        USART1_Write_String("\r\n");
+    }
 
-                    case NMEA_GPGLL:
-                        USART1_Write_String("GPGLL\r\n");
-                        USART1_Write_String(frame);
-                        break;
+    eventQueue_init();
+    frame_manager_init();
 
-                    default:
-                        USART1_Write_String("UNKNOWN\r\n");
-                        USART1_Write_String(frame);
-                        break;
-                }
-           } 
+    uart_config_t cfg =
+    {
+        .baud_rate = 9600
+    };
 
-        } 
-    } 
+    uart_init(&cfg);
+
+    while (1)
+{
+    uart_process_rx();
+
+    event_t evt;
+
+    if (eventQueue_poll(&evt) == EVENT_QUEUE_OK)
+    {
+        if (evt.event_id == EVT_UART_FRAME_READY)
+        {
+            frame_t *frame = (frame_t *)evt.param1;
+            gps_data_t gps;
+
+            switch (nmea_parse((const char *)frame->data))
+            {
+                case NMEA_GPRMC:
+
+                    if (gps_decode_rmc((const char *)frame->data, &gps))
+                    {
+                        USART1_Write_String("\r\n===== GPRMC =====\r\n");
+
+                        USART1_Write_String("UTC: ");
+                        USART1_Write_String(gps.utc_time);
+                        USART1_Write_String("\r\n");
+
+                        USART1_Write_String("LAT: ");
+                        USART1_Write_String(gps.latitude);
+                        USART1_Write_Raw(' ');
+                        USART1_Write_Raw(gps.latitude_dir);
+                        USART1_Write_String("\r\n");
+
+                        USART1_Write_String("LON: ");
+                        USART1_Write_String(gps.longitude);
+                        USART1_Write_Raw(' ');
+                        USART1_Write_Raw(gps.longitude_dir);
+                        USART1_Write_String("\r\n");
+
+                        USART1_Write_String("SPD: ");
+                        USART1_Write_String(gps.speed);
+                        USART1_Write_String("\r\n");
+
+                        USART1_Write_String("FIX: ");
+                        USART1_Write_String(gps.valid_fix ? "VALID" : "INVALID");
+                        USART1_Write_String("\r\n");
+                    }
+
+                    break;
+
+                default:
+                    break;
+            }
+
+            /* Return the frame to the pool */
+            frame_manager_release((int8_t)evt.param2);
+        }
+    }
+}
 }
