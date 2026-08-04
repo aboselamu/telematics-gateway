@@ -3,7 +3,7 @@
 # Target    : STM32F446RET6 (NUCLEO-F446RE)
 # =============================================================================
 
-TARGET    = telematics_gateway
+TARGET    = telematics-gateway
 BUILD_DIR = build
 
 # --- Toolchain ---
@@ -22,6 +22,7 @@ INCLUDES = -Iapp/inc \
            -Imiddleware/protocol/gps_nmea/inc \
 		   -Imiddleware/frame_manager/inc \
            -Idrivers/peripheral/uart \
+           -Idrivers/peripheral/i2c/inc \
            -Idrivers/peripheral/dma/inc \
            -Iplatform/inc \
            -Ithird_party/cmsis/Core/Include \
@@ -43,6 +44,7 @@ C_OBJS = $(BUILD_DIR)/main.o \
 		 $(BUILD_DIR)/gps_decoder.o \
 		 $(BUILD_DIR)/frame_manager.o \
          $(BUILD_DIR)/uart_driver.o \
+         $(BUILD_DIR)/i2c_driver.o \
          $(BUILD_DIR)/dma_driver.o \
          $(BUILD_DIR)/system_stm32f4xx.o
 
@@ -83,6 +85,11 @@ $(BUILD_DIR)/frame_manager.o: middleware/frame_manager/src/frame_manager.c
 
 $(BUILD_DIR)/uart_driver.o: drivers/peripheral/uart/uart_driver.c
 	@echo "  CC  drivers/peripheral/uart/uart_driver.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+$(BUILD_DIR)/i2c_driver.o: drivers/peripheral/i2c/src/i2c_driver.c
+	@echo "  CC  drivers/peripheral/i2c/src/i2c_driver.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/dma_driver.o: drivers/peripheral/dma/src/dma_driver.c
