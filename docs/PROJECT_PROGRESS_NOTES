@@ -1,0 +1,429 @@
+i2c_driver.c
+
+├── Includes
+│
+├── Private Defines
+│
+├── Driver Context
+│
+├── Private Function Prototypes
+│
+├── Public Functions
+│     ├── i2c_init()
+│     ├── i2c_write()
+│     ├── i2c_read()
+│     └── i2c_write_read()
+│
+└── Private Helpers
+      ├── i2c_configure_timing()
+      ├── i2c_generate_start()
+      ├── i2c_send_address()
+      ├── i2c_send_byte()
+      └── i2c_generate_stop()
+      └── i2c_wait_sr1_flag()
+
+
+progress 
+✓ Architecture
+✓ Public API (.h)
+
+↓
+
+✓ Driver Context => s_state = I2C_STATE_RESET
+
+↓
+
+✓ i2c_init()
+
+↓
+
+✓ Generate START => i2c_generate_start()
+
+↓
+
+✓ Send Address => i2c_send_address()
+
+↓
+
+▶ Send Byte   ← CURRENT
+Requirements              ✓ 
+Architecture              ✓
+Public API                ✓
+Driver Context            ✓
+i2c_init()                ✓
+Generate START            ✓
+Send Address              ✓
+
+────────────── CURRENT ──────────────
+
+Send Byte                 ✓
+Generate STOP             ✓
+i2c_write()               ◻
+Read Transaction          ◻
+Write-Read Transaction    ◻
+Hardware Test             ◻
+
+================================================================
+using polling while loop vs polling helper function
+
+START                       START
+   ↓                          ↓
+while()                     wait_flag()
+                              ↓
+ADDRESS                     ADDRESS
+   ↓                          ↓
+while()                     wait_flag()
+                              ↓
+BYTE                        BYTE
+   ↓                          ↓  
+while()                     wait_flag()
+   ↓                          ↓
+STOP                        STOP
+   ↓                          ↓
+while()                     wait_flag()
+
+================================================================
+Principle: Single Responsibility
+
+Let's separate the responsibilities into two private helpers:
+
+i2c_wait_sr1_flag()
+  Responsible for
+    polling
+    timeout
+    classifying the error
+    returning status
+
+        │
+        ▼
+Read SR1 once
+        │
+        ├── Success → return OK
+        │
+        ├── AF?
+        │      │
+        │      ▼
+        │ clear_error_flags(sr1)
+        │ return NACK
+        │
+        ├── BERR?
+        │      │
+        │      ▼
+        │ clear_error_flags(sr1)
+        │ return BUS
+        │
+        └── Timeout
+
+---Detection happens in one place.
+---Recovery/Cleanup happens in another.
+---Future interrupt and DMA versions can reuse the cleanup function.
+================================================================
+Let public transaction APIs own recovery
+
+When we implement i2c_write(), the flow will be:
+
+            Validate Parameters
+                    ↓
+            Check Driver State // free/ready, busy
+                    ↓
+            Set State = BUSY_TX // assign state, TAKING OWNERSHIP 
+                    ↓
+            Generate START      // then start the i2c_generate_start
+                    ↓
+            Send Address (Write) //i2c_send_address
+                    ↓
+            Loop Through Buffer // dta length
+                    ↓
+                Send Byte      //i2c_send_byte
+                    ↓
+            Generate STOP      //i2c_generate_stop
+                    ↓
+            State = READY      // free state 
+                    ↓
+            Return Status      // report back to caller func
+
+If any primitive returns an error:
+
+Primitive Error
+        ↓
+i2c_reset_bus()
+        ↓
+Return Error
+
+This keeps the layering clean:
+
+Public API
+    │
+    ├── Transaction orchestration
+    ├── Error recovery
+    └── State transitions
+
+Private Primitives
+    │
+    ├── Generate START
+    ├── Send Address
+    ├── Send Byte
+    └── Generate STOP
+
+Private Services
+    │
+    ├── Wait for SR1 flag
+    └── Clear error flags
+
+==================================================================
+wait_flag()
+
+↓
+
+detect error
+
+↓
+
+clear_error_flags()
+
+↓
+
+reset_bus()
+
+↓
+
+return error
+
+===========================================================
+                    Public API
+                  ---------------
+                   i2c_write()
+                        │
+     ┌──────────────────┼──────────────────┐
+     ▼                  ▼                  ▼
+generate_start()  send_address()    send_byte()
+                                         │
+                                         ▼
+                                 generate_stop()
+                        │
+                        ▼
+                i2c_wait_sr1_flag()
+                        │
+                        ▼
+             i2c_clear_error_flags()
+                        │
+                        ▼
+                 i2c_reset_bus() 
+==========================================================
+==========================================================
+Hardware Primitives        Driver Services        Transaction Layer     Public API
+generate_start()             wait_sr1_flag()      i2c_write()           
+send_address()               reset_bus()          i2c_read() // not yet,
+send_byte()                  clear_error_flags()
+generate_stop()              abort_transaction()
+==========================================================
+Design Decision 
+
+The transaction layer (i2c_read()) must decide:
+
+When to enable or disable ACK.
+When to generate STOP.
+Whether it's reading:
+1 byte,
+2 bytes,
+or more than 2 bytes.
+
+That keeps the primitive reusable and the architecture clean.
+==========================================================
+==========================================================
+==========================================================
+==========================================================
+==========================================================
+==========================================================
+==========================================================
+
+The transaction layer is like this:
+i2c_read()
+
+Acquire Driver
+        ↓
+Enable ACK        ← Transaction initialization
+        ↓
+Disable POS       ← Transaction initialization
+        ↓
+Generate START
+        ↓
+Send Address
+        ↓
+switch(length)
+        ↓
+receive_1_byte()
+receive_2_bytes()
+receive_n_bytes()
+        ↓
+Complete Transaction
+
+=============================================================
+for  read state
+i2c_read()
+    │
+    └── s_state = BUSY_RX
+             │
+             ↓
+    i2c_receive_1_byte()
+             │
+             ↓
+          failure
+             │
+             ↓
+    i2c_abort_transaction()
+             │
+             ↓
+       s_state = ERROR
+             │
+             ↓
+       return error
+follows:- this driver design pattern Decision
+PUBLIC API
+    ↓
+owns driver state
+    ↓
+TRANSACTION MANAGERS
+    ↓
+sequence only
+    ↓
+WORKERS
+    ↓
+hardware operation only       
+
+====================================================
+                  ┌─────────────┐
+                  │    READY    │
+                  └──────┬──────┘
+                         │
+                         ▼
+                    BUSY_RX
+                    /      \
+                   /        \
+             SUCCESS        ERROR
+                │             │
+                ▼             ▼
+             READY          ERROR
+                              │
+                              ▼
+                     explicit recovery
+                              │
+                              ▼
+                            READY
+return i2c_abort_transaction(status); // manager does: on transaction failure
+===============
+
+===||===>>>>>>>>>>>>>>>>>>>>>||<<<<<<<<<<<<<<<<<<===||===>>>>>>>>>>
+===||===>>>>>>>>>>   code descriptions <<<<<<<<<<===||===>>>>>>>>>>
+
+* static i2c_status_t i2c_receive_2_bytes(uint8_t address, uint8_t *p_data)
+ACK = 1, POS = 0
+START
+wait SB
+send address + read
+wait ADDR
+POS = 1
+ACK = 0
+clear ADDR
+wait BTF
+STOP
+read DR twice
+____________________________________
+
+The flow now is:
+
+BERR  → clear and continue
+ARLO  → return error
+AF    → return NACK
+OVR   → return error
+Event → return success
+
+The line:
+
+sr1 &= ~I2C_SR1_BERR;
+
+Only updates the local snapshot, preventing the already-detected 
+BERR from affecting the remaining checks during that loop iteratio
+_____________________________________
+       init func
+initialization sequence becomes:
+
+Enable clocks
+    ↓
+Reset I2C1 peripheral
+    ↓
+Keep PE disabled
+    ↓
+Set OAR1 bit 14
+    ↓
+Configure GPIO
+    ↓
+Configure CR2, CCR and TRISE
+    ↓
+Enable PE
+    ↓
+Set software state READY
+______________________________________
+i2c_abort_sequence()
+    ├── If still master: request STOP
+    ├── If not master: cancel pending START
+    └── Preserve and return the original error
+_______________________________________
+Because the improved i2c_init() now resets the peripheral through:
+
+RCC->APB1RSTR |= RCC_APB1RSTR_I2C1RST;
+RCC->APB1RSTR &= ~RCC_APB1RSTR_I2C1RST;
+
+that performs an actual hardware reset before returning the driver to READY.
+State contract:
+
+READY
+  ↓ transaction failure
+ERROR
+  ↓ i2c_init()
+RESET hardware → configure → READY
+Later, when implementing the interrupt/DMA version, a dedicated public recovery API may be justified:
+
+i2c_status_t i2c_recover(void);
+But that function must recover and validate the hardware, not merely modify s_state.
+______________________________________
+        STATE POLICY BE read
+Successful transaction
+    → STOP completes
+    → READY
+
+NACK
+    → STOP completes
+    → return NACK
+    → READY
+
+NACK + STOP completion failure
+    → ERROR
+
+Timeout or bus fault
+    → ERROR
+
+
+    SELECTED ENGINEERING PROJECTS
+
+STM32 Bare-Metal Driver Library
+* Developed reusable STM32 firmware components for GPIO, timers/PWM, UART/USART, SPI, I2C, CAN and DMA, with
+  peripheral-level abstractions intended to support modular application development.
+* Structured the codebase around clear interfaces, interrupt-driven operation and maintainable driver separation; used
+  Git/GitHub for version control and project documentation.
+UART DMA & Event-Driven Communication Framework
+* Implemented DMA-based UART reception with ring buffers and event queues to support non-blocking communication and
+  improve separation between low-level drivers and application logic.
+* Applied repeatable HIL and stress-test workflows to validate communication handling and fault-recovery behaviour.
+CAN & FreeRTOS Telematics Gateway Components
+* Integrated CAN communication with FreeRTOS-based firmware components on STM32, using layered architecture and unit
+  testing to support maintainability and reliable integration.
+
+UNIVERSITY FINAL-YEAR PROJECT
+
+Small Fire-Fighting Robot
+* Developed a working autonomous prototype intended for office, residential and server-room environments, combining
+  sensors, embedded control and actuator operation.
+* Applied image processing and TensorFlow-based computer vision for fire-related scene detection and integrated the
+  perception output with robot navigation and response logic.
+* Completed system integration and prototype testing across sensing, software and electromechanical subsystems.

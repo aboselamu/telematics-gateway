@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug STM32",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/telematics-gateway.elf",
+
+      "request": "launch",
+      "type": "cortex-debug",
+      "servertype": "openocd",
+
+      "armToolchainPath": "C:/Users/USER/scoop/apps/gcc-arm-none-eabi/current/bin",
+
+      "configFiles": [
+        "interface/stlink.cfg",
+        "target/stm32f4x.cfg"
+      ],
+
+      "device": "STM32F446RE",
+      "runToEntryPoint": "main",
+      "showDevDebugOutput": "raw"
+    }
+  ]
+}

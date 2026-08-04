@@ -1,0 +1,106 @@
+// 1. Enable Clocks
+RCC->AHB1ENR |= (1 << 1);    // Enable GPIOB clock
+RCC->APB1ENR |= (1 << 21);   // Enable I2C1 clock
+
+// 2. Configure GPIOB Pins 6 and 7
+// MODER: Alternate Function (10 = 2U)
+GPIOB->MODER &= ~((3U << (6 * 2)) | (3U << (7 * 2))); 
+GPIOB->MODER |=  ((2U << (6 * 2)) | (2U << (7 * 2)));
+
+// OTYPER: Open Drain (1U)
+GPIOB->OTYPER |= ((1U << 6) | (1U << 7));
+
+// OSPEEDR: High Speed (11 = 3U)
+GPIOB->OSPEEDR &= ~((3U << (6 * 2)) | (3U << (7 * 2))); 
+GPIOB->OSPEEDR |=  ((3U << (6 * 2)) | (3U << (7 * 2)));
+
+// PUPDR: Pull-up (01 = 1U)
+GPIOB->PUPDR &= ~((3U << (6 * 2)) | (3U << (7 * 2))); 
+GPIOB->PUPDR |=  ((1U << (6 * 2)) | (1U << (7 * 2)));
+
+// AFR[0] (AFRL): Alternate Function 4 (0100 = 4U) for I2C1
+GPIOB->AFR[0] &= ~((0xFU << (6 * 4)) | (0xFU << (7 * 4))); 
+GPIOB->AFR[0] |=  ((4U << (6 * 4)) | (4U << (7 * 4)));
+
+// 1. Software Reset: Toggle SWRST bit to flush the peripheral
+I2C1->CR1 |=  (1 << 15);      // Put I2C1 in reset state
+I2C1->CR1 &= ~(1 << 15);      // Bring I2C1 out of reset state
+
+// 2. Set APB1 Clock Frequency (45MHz)
+I2C1->CR2 |= (45U << 0);
+
+// 3. Configure Clock Control Register (Standard Mode, 100kHz)
+I2C1->CCR &= ~((1 << 14) | (1 << 15)); // Ensure DUTY and F/S are 0
+I2C1->CCR |= (225 << 0);               // Set CCR to 225
+
+// 4. Configure Maximum Rise Time
+I2C1->TRISE |= (46U << 0);
+
+// 5. Enable the Peripheral
+I2C1->CR1 |= (1U << 0);       // Set PE bit
+
+
+void i2c_start(void) {
+    I2C1->CR1 |= (1 << 8);           // Set START bit
+    while (!(I2C1->SR1 & (1 << 0))); // Wait for SB flag
+}
+
+void i2c_send_address(uint8_t address) {
+    I2C1->DR = address;              // Send address
+    while (!(I2C1->SR1 & (1 << 1))); // Wait for ADDR flag
+    
+    // Safely clear the ADDR flag by reading SR1 then SR2
+    //volatile uint32_t dummy_read = I2C1->SR1;
+    //dummy_read = I2C1->SR2;
+    // (void)dummy_read; 
+    // CHECK 1
+}
+
+void i2c_stop(void) {
+    I2C1->CR1 |= (1 << 9);           // Set STOP bit
+}
+
+void i2c_clear_addr(void) {
+    volatile uint32_t dummy_read = I2C1->SR1;
+    dummy_read = I2C1->SR2;
+    (void)dummy_read; 
+}
+
+uint8_t i2c_read(void) {
+    // 0. Manager forces a known starting state BEFORE doing anything
+    I2C1->CR1 |= (1 << 10);  // SET the ACK bit (Expect to receive)
+    
+    // 1. Initiate transfer (Manager delegates to Worker)
+    i2c_start();
+    i2c_send_address(0xD1); // Stops and waits at ADDR flag
+    
+    // 2. The Smart Manager makes decisions BEFORE opening the floodgates
+    I2C1->CR1 &= ~(1 << 10); // CLEAR the ACK bit (Pre-NACK the upcoming byte)
+    
+    // 3. Manager opens the floodgate
+    i2c_clear_addr(); 
+    
+    // 4. Manager immediately queues the STOP condition
+    i2c_stop();
+    
+    // 5. Worker waits for the hardware to finish clocking the data
+    while (!(I2C1->SR1 & (1 << 6))); // Wait for RXNE flag (Bit 6)
+    
+    // 6. Worker retrieves the final payload
+    uint8_t r_data = I2C1->DR;
+    
+    return r_data;
+}
+
+================================================================================
+1. The Dumb Worker (i2c_write_address) was acting like a rogue employee. It was completing its task (sending the address) 
+  but then unilaterally opening the floodgate (clearing ADDR) without checking with the Manager.
+  To fix this and maintain perfect architecture, we must strip the ADDR clearing logic out of the worker.
+================================================================================
+
+"The Hardware Reality: The ADDR Floodgate
+In the STM32 I2C peripheral, the ADDR flag doesn't just mean "the address matched." It acts as a clock-stretching pause button. While the ADDR flag is set, the SCL line is held LOW by the STM32, pausing the bus so your software has time to decide what to do next.
+
+The moment you clear the ADDR flag (by reading SR1 then SR2), you release the SCL line. The floodgate opens, and the hardware immediately begins clocking in the data bits from the DS3231.
+
+If your i2c_write_address() function automatically clears ADDR before returning, the bus is already clocking in data before your i2c_read() function gets a chance to turn off the ACK bit. You are instantly thrown back into the exact race condition you are trying to write a LinkedIn post about!"
