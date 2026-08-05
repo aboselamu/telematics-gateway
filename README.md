@@ -1,250 +1,118 @@
-# Telematics Gateway
+# Telematic Gateway (TG)
 
-> **A production-oriented, bare-metal embedded gateway built on the
-> STM32F4 platform, demonstrating scalable firmware architecture,
-> hardware abstraction, defensive driver design, and event-driven
-> communication for automotive and industrial telematics systems.**
+> **A production-oriented bare-metal embedded firmware platform built on
+> STM32F446RE using CMSIS register-level programming.**
 
-The project is developed incrementally using a structured
-architecture-first methodology. Every subsystem progresses through
-requirements, architecture, implementation, verification, and
-Hardware-in-the-Loop (HIL) validation before integration.
+The **Telematic Gateway (TG)** is a long-term embedded systems project
+focused on designing reusable, production-quality firmware architectures
+rather than isolated peripheral demonstrations.
 
-------------------------------------------------------------------------
+Instead of simply implementing UART, SPI, I²C or CAN drivers, this
+project emphasizes software architecture, modularity, deterministic
+state machines, hardware abstraction, and Hardware-in-the-Loop (HIL)
+verification.
 
-# Project Objectives
+Every component is developed incrementally and validated on real
+hardware before becoming part of the platform.
 
-This repository is not intended to demonstrate isolated peripheral
-examples.
+## Why This Project Exists
 
-Instead, it focuses on designing a reusable firmware architecture
-capable of scaling from a single UART interface into a complete
-multi-protocol telematics gateway supporting:
+Many embedded repositories demonstrate how to make a peripheral work.
 
--   UART
--   DMA
--   I²C
--   SPI
--   CAN Bus
--   External Sensors
--   LTE Modem
--   GPS Receiver
--   Cloud Connectivity
+This project demonstrates how professional firmware is engineered.
 
-while maintaining deterministic execution, predictable memory usage, and
-complete separation between hardware and application logic.
+### Focus Areas
 
-------------------------------------------------------------------------
+-   Reusable drivers
+-   Layered architecture
+-   Deterministic execution
+-   Maintainability
+-   Scalability
+-   Hardware-in-the-Loop validation
 
-# Firmware Design Principles
+## Design Philosophy
 
-## Event-Driven Architecture
+> Correct architecture is more valuable than working code that cannot
+> evolve.
 
-Hardware peripherals never execute application logic directly.
+### Driver Architecture
 
 ``` text
-Peripherals
-      │
-      ▼
-Interrupt Service Routines
-      │
-      ▼
-Event Queue
-      │
-      ▼
-Dispatcher
-      │
-      ▼
-Application Services
-```
-
-## Memory Ownership
-
-DMA buffers belong exclusively to the transport layer.
-
-Application code never parses volatile DMA memory.
-
-``` text
-DMA Circular Buffer
-        │
-        ▼
-Frame Builder
-        │
-        ▼
-Static Frame Buffer
-        │
-        ▼
-Event Queue
-        │
-        ▼
-Protocol Parser
-```
-
-## Hardware Abstraction
-
-Application code communicates only through driver interfaces.
-
-``` text
-Application
+Public API
     │
     ▼
-Driver API
+Transaction Managers
     │
     ▼
-Driver Services
-    │
-    ▼
-Hardware Primitives
+Primitive Workers
     │
     ▼
 STM32 Registers
 ```
 
-## Defensive Programming
+Public APIs validate parameters and dispatch transactions.
 
--   Parameter validation
--   Driver state management
--   Software timeout protection
--   Centralized error detection
--   Bus recovery mechanisms
--   Static memory allocation
--   No dynamic memory allocation
+Transaction Managers implement protocol sequences.
 
-------------------------------------------------------------------------
+Primitive Workers perform exactly one hardware operation.
 
-# Development Progress
+## Engineering Principles
 
-## Phase 0 --- Project Foundation
+-   Bare-metal CMSIS (No HAL / No LL)
+-   Single Responsibility Principle
+-   Separation of Policy and Mechanism
+-   Deterministic State Machines
+-   Centralized Error Handling
+-   Reusable Driver Interfaces
 
-**Status:** ✅ Completed
+## Project Progress
 
-Repository structure, architecture, Git workflow, Jira integration and
-coding conventions established.
+### Phase 0 & 1 --- Foundation ✅
 
-## Phase 1 --- Event Queue Framework
+-   Software Architecture
+-   Coding Standards
+-   Event Queue
+-   Ring Buffer
 
-**Status:** ✅ Completed & Verified
+### Phase 2 & 3 --- UART, DMA & Streaming Middleware ✅
 
--   Lock-free circular queue
--   Static memory allocation
--   Zero-copy event envelopes
--   ISR-safe producer model
+-   UART Driver
+-   DMA Circular Reception
+-   Frame Builder
+-   Frame Manager
+-   Protocol Parser
+-   GPS Decoder
+-   End-to-End HIL Validation
 
-Verified through desktop testing of queue wrap-around, saturation and
-boundary conditions.
+### Phase 4 --- I²C Driver ✅
 
-## Phase 2 --- Production UART Driver
+-   Polling Master Driver
+-   Read / Write Transactions
+-   Repeated START
+-   Transaction Managers
+-   Primitive Workers
+-   RM0390 Event Sequencing
+-   HIL Validation
 
-**Status:** ✅ Completed & Hardware Verified
+### Planned
 
--   Interrupt-driven UART
--   Dual circular ring buffers
--   Non-blocking API
--   Event-driven notifications
+-   SPI Driver
+-   CAN Driver
+-   RTOS Integration
+-   Gateway Services
+-   Cloud Connectivity
 
-Verified with Hardware-in-the-Loop testing:
+## Hardware Platform
 
 -   STM32F446RE
--   Python + PySerial
--   500 stress cycles
--   Zero dropped frames
--   Zero buffer overruns
+-   ARM Cortex-M4
+-   STM32CubeIDE
+-   CMSIS
+-   ST-Link V2/V3
 
-## Phase 3 --- DMA Integration & Data Pipeline Architecture
+## Long-Term Vision
 
-**Status:** 🚧 In Progress
-
-Current architectural milestones:
-
--   DMA-driven UART reception
--   Memory Ownership architecture
--   Frame Builder abstraction
--   Static frame buffers
--   Zero-copy event notifications
--   Production-grade I²C driver foundation
-
-------------------------------------------------------------------------
-
-# Project Structure
-
-``` text
-telematics-gateway/
-├── app/
-├── middleware/
-│   ├── event_queue.h
-│   └── event_queue.c
-├── drivers/
-│   ├── uart_driver.*
-│   ├── dma_driver.*
-│   └── i2c_driver.*
-├── tests/
-│   ├── unit/
-│   └── hil/
-└── docs/
-```
-
-------------------------------------------------------------------------
- 
-# Engineering Workflow
-
-``` text
-Requirements
-      │
-      ▼
-Architecture
-      │
-      ▼
-Public API
-      │
-      ▼
-Driver Context
-      │
-      ▼
-Implementation
-      │
-      ▼
-Unit Verification
-      │
-      ▼
-Hardware-in-the-Loop Testing
-      │
-      ▼
-Production Integration
-```
-
-------------------------------------------------------------------------
-
-# Development Roadmap
-
-  Phase                                   Status
-  --------------------------------------- --------
-  Phase 0 --- Project Foundation          ✅
-  Phase 1 --- Event Queue Framework       ✅
-  Phase 2 --- UART Driver                 ✅
-  Phase 3 --- DMA & Driver Architecture   🚧
-  Phase 4 --- SPI Driver                  ⏳
-  Phase 5 --- CAN Driver                  ⏳
-  Phase 6 --- I²C Integration             ⏳
-  Phase 7 --- Sensor Services             ⏳
-  Phase 8 --- Telematics Services         ⏳
-  Phase 9 --- RTOS Migration              ⏳
-  Phase 10 --- Cloud Gateway              ⏳
-  Phase 11 --- Production Optimization    ⏳
-
-------------------------------------------------------------------------
-
-# Project Management
-
-Development is managed using **Jira** integrated with **GitHub**.
-
-Every feature follows:
-
--   Requirements
--   Design
--   Implementation
--   Code Review
--   Hardware Validation
--   Completion
-
-Branches, commits and pull requests are linked to Jira issues to provide
-end-to-end traceability throughout the firmware development lifecycle.
+The goal of this repository is to demonstrate how production embedded
+firmware is architected from low-level peripheral drivers through
+middleware, services, and gateway functionality while validating every
+subsystem using real hardware.
