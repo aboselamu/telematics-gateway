@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building and Hardware-Verifying a Bare-Metal I²C Driver on the STM32F446RE</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 24pt;
+            color: #111827;
+            line-height: 1.25;
+            margin-bottom: 8px;
+        }
+        h2 {
+            font-size: 14pt;
+            color: #374151;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+        }
+        p, li {
+            font-size: 10.5pt;
+            margin-bottom: 12px;
+        }
+        ul, ol {
+            padding-left: 20px;
+            margin-bottom: 12px;
+        }
+        pre {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: "Consolas", "Courier New", Courier, monospace;
+            font-size: 9.5pt;
+            line-height: 1.45;
+            margin: 16px 0;
+            page-break-inside: avoid;
+        }
+        code {
+            font-family: "Consolas", "Courier New", Courier, monospace;
+            background-color: #f3f4f6;
+            color: #1f2937;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 9.5pt;
+        }
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 10pt;
+            page-break-inside: avoid;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+        }
+        blockquote {
+            margin: 16px 0;
+            padding-left: 16px;
+            border-left: 4px solid #3b82f6;
+            color: #4b5563;
+            font-style: italic;
+        }
+        .caption {
+            font-size: 9pt;
+            color: #6b7280;
+            font-style: italic;
+            margin-top: -8px;
+            margin-bottom: 16px;
+        }
+        @media print {
+            body {
+                max-width: 100%;
+                padding: 0;
+            }
+            pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Building and Hardware-Verifying a Bare-Metal I²C Driver on the STM32F446RE</h1>
+
+<p><strong>From repeated-START transactions and length-specific receive sequences to stuck-bus recovery, fault injection, and 10,000 consecutive hardware transfers</strong></p>
+
+<p><strong>Cover image:</strong> Use the photograph showing the STM32F446RE, DS3231 module, wiring, ST-Link/debug connection, and test setup.</p>
+
+<p><strong>Suggested cover caption:</strong></p>
+<p class="caption">Hardware setup used to develop and verify the polling-based I²C driver: STM32F446RE, DS3231 RTC, ST-Link debugging, and controlled SDA fault injection.</p>
+
+<p>Reading a few bytes from an I²C peripheral is not difficult when everything is working.</p>
+
+<p>The more important engineering question is:</p>
+
+<p>What happens when the target does not acknowledge, the bus remains busy, SDA is physically held low, a caller passes an invalid pointer, or one transaction fails immediately before another begins?</p>
+
+<p>As part of a larger STM32-based telematics gateway project, I developed a polling-based I²C driver from scratch for the STM32F446RE using direct CMSIS register access.</p>
+
+<p>The objective was not simply to retrieve the time from a DS3231 real-time clock. The objective was to establish a known-good peripheral-driver baseline with:</p>
+
+<ul>
+    <li>Explicit state management</li>
+    <li>Predictable error classification</li>
+    <li>Correct handling of one-, two-, and multi-byte receives</li>
+    <li>Combined write–read transactions using repeated START</li>
+    <li>Recoverable and non-recoverable fault paths</li>
+    <li>Runtime peripheral recovery</li>
+    <li>Defensive API validation</li>
+    <li>Repeatable hardware verification</li>
+</ul>
+
+<p>The completed implementation passed nine hardware tests, including a controlled stuck-SDA fault and 10,000 consecutive combined transactions with zero failures.</p>
+
+<p>This article describes the driver architecture, the STM32-specific receive sequencing, the verification approach, the failures injected into the physical bus, and the lessons that will carry into the next interrupt-driven version.</p>
+
+<h2>1. Project context: an I²C foundation for a telematics gateway</h2>
+
+<p>A telematics gateway typically sits between several devices and communication interfaces. Depending on the final architecture, it may interact with:</p>
+
+<ul>
+    <li>A real-time clock</li>
+    <li>GNSS receivers</li>
+    <li>Cellular modems</li>
+    <li>CAN networks</li>
+    <li>External non-volatile memory</li>
+    <li>Sensors</li>
+    <li>Diagnostic services</li>
+    <li>Local or cloud-facing communication layers</li>
+</ul>
+
+<p>Before building those higher-level services, I wanted a reliable peripheral layer.</p>
+
+<p>The first target was the DS3231 RTC because it provides a simple but useful hardware test case:</p>
+
+<ul>
+    <li>It uses a standard 7-bit I²C address</li>
+    <li>It supports register-based reads and writes</li>
+    <li>Reading time requires a combined write–read transaction</li>
+    <li>The returned values change continuously</li>
+    <li>The register map provides practical tests for one-, two-, and multi-byte reception</li>
+</ul>
+
+<p>The hardware configuration was:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Item</th>
+            <th>Configuration</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>Microcontroller</td><td>STM32F446RE</td></tr>
+        <tr><td>I²C peripheral</td><td>I²C1</td></tr>
+        <tr><td>SCL</td><td>PB6, alternate function AF4</td></tr>
+        <tr><td>SDA</td><td>PB7, alternate function AF4</td></tr>
+        <tr><td>Peripheral clock</td><td>APB1 at 45 MHz</td></tr>
+        <tr><td>Configured I²C clock</td><td>Approximately 88 kHz</td></tr>
+        <tr><td>Target device</td><td>DS3231 RTC</td></tr>
+        <tr><td>Target address</td><td>0x68</td></tr>
+        <tr><td>Debug interface</td><td>ST-Link with OpenOCD and GDB</td></tr>
+        <tr><td>Firmware style</td><td>Bare-metal C using CMSIS register access</td></tr>
+    </tbody>
+</table>
+
+<p>The driver configures PB6 and PB7 as open-drain alternate-function pins and relies on external pull-ups provided by the I²C hardware setup. The configuration, public API, explicit state enumeration, and detailed error codes are defined in the driver interface.</p>
+
+<h2>2. Why I started with a polling implementation</h2>
+
+<p>The final gateway will not use a blocking polling driver for every communication operation.</p>
+
+<p>However, beginning with a polling version had important advantages:</p>
+
+<ul>
+    <li>Every peripheral event could be inspected in sequence.</li>
+    <li>Register transitions could be correlated directly with the reference-manual flow.</li>
+    <li>Error handling could be developed without interrupt concurrency.</li>
+    <li>One-, two-, and N-byte receive behaviour could be verified independently.</li>
+    <li>The completed version could become a reference model for the interrupt-driven implementation.</li>
+</ul>
+
+<p>The V1 contract was intentionally limited:</p>
+
+<ul>
+    <li>Single execution context</li>
+    <li>Blocking operation</li>
+    <li>Not reentrant</li>
+    <li>Not callable from an interrupt service routine</li>
+    <li>One active transaction at a time</li>
+</ul>
+
+<p>That limitation was deliberate. The aim was correctness and observability before concurrency.</p>
+
+<p>The current timeout is also implemented as a software loop counter. This is sufficient for bring-up and controlled testing, but the real elapsed timeout depends on CPU frequency, compiler optimisation, and register-access latency. A later version should replace it with a timer- or system-tick-based deadline.</p>
+
+<h2>3. Public driver interface</h2>
+
+<p>The driver exposes six primary functions:</p>
+
+<pre><code>i2c_status_t i2c_init( 
+   const i2c_config_t *p_config); 
+ 
+i2c_status_t i2c_write( 
+   uint8_t device_address, 
+   const uint8_t *p_data, 
+   uint16_t length); 
+ 
+i2c_status_t i2c_read( 
+   uint8_t device_address, 
+   uint8_t *p_data, 
+   uint16_t length); 
+ 
+i2c_status_t i2c_write_read( 
+   uint8_t device_address, 
+   const uint8_t *p_tx_data, 
+   uint16_t tx_length, 
+   uint8_t *p_rx_data, 
+   uint16_t rx_length); 
+ 
+i2c_state_t i2c_get_state(void); 
+ 
+i2c_status_t i2c_recover(void);</code></pre>
+
+<p>The interface separates four responsibilities:</p>
+
+<ul>
+    <li>Initialization</li>
+    <li>Standalone transmission</li>
+    <li>Standalone reception</li>
+    <li>Combined write–read operation</li>
+</ul>
+
+<p>The combined function is particularly important for register-based peripherals.</p>
+
+<p>To read the DS3231 seconds and minutes registers, for example, the controller must:</p>
+
+<p>START<br>
+→ address + write<br>
+→ transmit register address 0x00<br>
+→ repeated START<br>
+→ address + read<br>
+→ receive requested bytes<br>
+→ NACK final byte<br>
+→ STOP</p>
+
+<p>Generating a STOP between the write and read phases would create two independent transactions and would not preserve the intended register-access sequence.</p>
+
+<h2>4. Explicit driver states</h2>
+
+<p>One design decision that improved both testing and fault handling was to make the software state explicit.</p>
+
+<pre><code>typedef enum 
+{ 
+   I2C_STATE_RESET = 0, 
+   I2C_STATE_READY, 
+   I2C_STATE_BUSY_TX, 
+   I2C_STATE_BUSY_RX, 
+   I2C_STATE_BUSY_TX_RX, 
+   I2C_STATE_ERROR 
+} i2c_state_t;</code></pre>
+
+<p>The state model establishes a clear contract:</p>
+
+<p>RESET<br>
+ |<br>
+ | successful initialization<br>
+ v<br>
+READY<br>
+ |<br>
+ | transaction admitted<br>
+ v<br>
+BUSY_TX / BUSY_RX / BUSY_TX_RX<br>
+ |<br>
+ | clean STOP and completion<br>
+ v<br>
+READY</p>
+
+<p>A hard failure follows a different path:</p>
+
+<p>BUSY<br>
+ |<br>
+ | timeout, unusable bus or uncertain peripheral state<br>
+ v<br>
+ERROR<br>
+ |<br>
+ | explicit successful recovery<br>
+ v<br>
+READY</p>
+
+<p>This prevents the application from beginning a new operation when the physical or peripheral state is uncertain.</p>
+
+<p>For example:</p>
+
+<ul>
+    <li>Calling a transaction before initialization returns <code>I2C_ERR_NOT_INIT</code></li>
+    <li>Calling while another operation is active returns <code>I2C_ERR_BUSY</code></li>
+    <li>Calling after a hard failure returns <code>I2C_ERR_LOCKED</code></li>
+    <li>Invalid addresses, lengths, or pointers return <code>I2C_ERR_PARAM</code></li>
+    <li>A detected unusable bus returns <code>I2C_ERR_BUS</code></li>
+</ul>
+
+<p>The full set of status and state values is part of the public driver interface.</p>
+
+<h2>5. Software state and physical bus state are not the same thing</h2>
+
+<p>A key lesson from this work was that software state alone is insufficient.</p>
+
+<p>The driver may believe it is READY, while the peripheral’s SR2.BUSY flag indicates that the physical bus is still occupied or stuck.</p>
+
+<p>For this reason, transaction admission includes two checks:</p>
+
+<ol>
+    <li>Is the software state READY?</li>
+    <li>Is the hardware bus actually idle?</li>
+</ol>
+
+<p>A simplified form of the gatekeeping logic is:</p>
+
+<pre><code>switch (s_state) 
+{ 
+   case I2C_STATE_READY: 
+       if ((I2C1->SR2 & I2C_SR2_BUSY) != 0U) 
+       { 
+           s_state = I2C_STATE_ERROR; 
+           return I2C_ERR_BUS; 
+       } 
+ 
+       s_state = I2C_STATE_BUSY_TX_RX; 
+       break; 
+ 
+   case I2C_STATE_RESET: 
+       return I2C_ERR_NOT_INIT; 
+ 
+   case I2C_STATE_BUSY_TX: 
+   case I2C_STATE_BUSY_RX: 
+   case I2C_STATE_BUSY_TX_RX: 
+       return I2C_ERR_BUSY; 
+ 
+   case I2C_STATE_ERROR: 
+       return I2C_ERR_LOCKED; 
+ 
+   default: 
+       return I2C_ERR_LOCKED; 
+}</code></pre>
+
+<p>This protects the driver from starting a new transaction merely because an internal variable says the controller is available.</p>
+
+<p>The implemented transaction managers validate parameters, check both the software and hardware states, acquire the correct busy state, execute the transfer, verify STOP completion, and only then return to READY.</p>
+
+<h2>6. The STM32 receive problem: one size does not fit all</h2>
+
+<p>One of the most important technical parts of the driver was the receive implementation.</p>
+
+<p>On this STM32 I²C peripheral, a one-byte receive, a two-byte receive, and a longer receive cannot be handled with one generic loop.</p>
+
+<p>The sequence in which software modifies ACK, POS, clears ADDR, requests STOP, and reads the data register affects what the peripheral places on the bus.</p>
+
+<p>The driver therefore uses three dedicated receive helpers:</p>
+
+<pre><code>i2c_receive_1_byte(...); 
+i2c_receive_2_bytes(...); 
+i2c_receive_n_bytes(...);</code></pre>
+
+<p>The public <code>i2c_read()</code> and <code>i2c_write_read()</code> functions dispatch according to the requested receive length.</p>
+
+<h3>6.1 One-byte receive</h3>
+
+<p>For a single-byte read, the controller must prepare to NACK the first and only byte.</p>
+
+<p>The critical ordering is:</p>
+
+<p>Generate START<br>
+→ send address in read mode<br>
+→ wait for ADDR<br>
+→ disable ACK<br>
+→ clear ADDR<br>
+→ request STOP<br>
+→ wait for RXNE<br>
+→ read DR</p>
+
+<p>The significant point is that ACK is disabled before clearing ADDR.</p>
+
+<p>Clearing ADDR opens the receive path. If the peripheral remains configured to ACK at that point, the controller may acknowledge a byte that should have been the final byte.</p>
+
+<h3>6.2 Two-byte receive</h3>
+
+<p>The two-byte case uses a different sequence:</p>
+
+<p>Set POS<br>
+→ clear ACK<br>
+→ clear ADDR<br>
+→ wait for BTF<br>
+→ request STOP<br>
+→ read first byte<br>
+→ read second byte<br>
+→ restore normal ACK/POS configuration</p>
+
+<p>Waiting for BTF indicates that the final two bytes are ready in the receive pipeline.</p>
+
+<h3>6.3 N-byte receive</h3>
+
+<p>For a longer transfer, ACK remains enabled while the intermediate bytes are received.</p>
+
+<p>The sequence changes when three bytes remain:</p>
+
+<p>Receive intermediate bytes normally<br>
+→ when three bytes remain, wait for BTF<br>
+→ clear ACK<br>
+→ read N-2 byte<br>
+→ wait for BTF again<br>
+→ request STOP<br>
+→ read final two bytes</p>
+
+<p>Separating these paths made the code easier to review and made the verification tests much more meaningful.</p>
+
+<p>A generic loop might appear shorter, but it would hide the exact hardware sequencing that determines whether the final bytes are acknowledged correctly.</p>
+
+<h2>7. Combined write–read with repeated START</h2>
+
+<p>A DS3231 register read begins with a write phase containing the register address.</p>
+
+<p>The transmit helper performs:</p>
+
+<p>START<br>
+→ write address<br>
+→ clear ADDR<br>
+→ send register-address byte<br>
+→ wait for final BTF</p>
+
+<p>For a standalone write, the driver requests STOP after the final BTF.</p>
+
+<p>For a combined transaction, it deliberately does not generate STOP.</p>
+
+<p>Instead, while the controller still owns the bus, the selected receive helper generates another START. Because the bus remains owned, that becomes the required repeated START.</p>
+
+<p>The high-level sequence is:</p>
+
+<pre><code>status = i2c_transmit_phase( 
+   address, 
+   p_tx_data, 
+   tx_length); 
+ 
+if (status == I2C_OK) 
+{ 
+   if (rx_length == 1U) 
+   { 
+       status = i2c_receive_1_byte( 
+           address, 
+           p_rx_data); 
+   } 
+   else if (rx_length == 2U) 
+   { 
+       status = i2c_receive_2_bytes( 
+           address, 
+           p_rx_data); 
+   } 
+   else 
+   { 
+       status = i2c_receive_n_bytes( 
+           address, 
+           p_rx_data, 
+           rx_length); 
+   } 
+}</code></pre>
+
+<p>Only after the receive helper has requested STOP does the transaction manager verify that the hardware returned to an idle state and release the software state back to READY.</p>
+
+<h2>8. Error classification: not every failure should lock the driver</h2>
+
+<p>One of the more useful design distinctions was separating a recoverable target NACK from a failure that leaves the hardware state uncertain.</p>
+
+<p><strong>Recoverable NACK</strong></p>
+
+<p>A NACK can be a legitimate transaction result:</p>
+
+<ul>
+    <li>No target is connected at the requested address</li>
+    <li>The target is temporarily unavailable</li>
+    <li>The address is wrong</li>
+    <li>The target refuses the current operation</li>
+</ul>
+
+<p>When a NACK occurs, the driver:</p>
+
+<ul>
+    <li>Requests transaction termination</li>
+    <li>Clears relevant residual control conditions</li>
+    <li>Verifies STOP completion</li>
+    <li>Returns <code>I2C_ERR_NACK</code></li>
+    <li>Returns the state to READY only when cleanup succeeds</li>
+</ul>
+
+<p>This means the application receives the original NACK result without losing the ability to perform another transaction.</p>
+
+<p><strong>Hard or uncertain failure</strong></p>
+
+<p>Timeouts, bus errors, overruns, arbitration-related failures, or failed cleanup are treated differently.</p>
+
+<p>The driver moves to:</p>
+
+<p><code>I2C_STATE_ERROR</code></p>
+
+<p>Further transaction attempts return:</p>
+
+<p><code>I2C_ERR_LOCKED</code></p>
+
+<p>The application must explicitly call:</p>
+
+<p><code>i2c_recover();</code></p>
+
+<p>This avoids silently continuing after an operation that may have left the peripheral or physical bus in an unknown condition.</p>
+
+<p>The source implements this distinction consistently across read, write, and combined write–read operations.</p>
+
+<h2>9. Hardware verification strategy</h2>
+
+<p>The driver was verified using:</p>
+
+<ul>
+    <li>STM32F446RE hardware</li>
+    <li>DS3231 RTC module</li>
+    <li>ST-Link debugging</li>
+    <li>VS Code with Cortex-Debug</li>
+    <li>OpenOCD</li>
+    <li>GDB expressions</li>
+    <li>Direct register inspection</li>
+    <li>Controlled disconnection of SDA</li>
+    <li>Controlled pull-down of SDA through a resistor</li>
+    <li>Repeated hardware transactions</li>
+</ul>
+
+<p>The most useful register and GPIO checks were:</p>
+
+<pre><code>p/x (GPIOB->IDR & 0xC0) 
+p/x I2C1->SR1 
+p/x I2C1->SR2 
+p/x I2C1->CR1</code></pre>
+
+<p>For PB6 and PB7:</p>
+
+<p>0xC0 = 0b11000000<br>
+PB7/SDA = high<br>
+PB6/SCL = high</p>
+
+<p>During a forced-low SDA fault:</p>
+
+<p>0x40 = 0b01000000<br>
+PB7/SDA = low<br>
+PB6/SCL = high</p>
+
+<p>The verification was organised into nine tests.</p>
+
+<h2>10. Test 1 — Recoverable address NACK during a combined transaction</h2>
+
+<p>The first fault test disconnected the DS3231 SDA connection while preserving the line pull-up.</p>
+
+<p>The driver attempted a combined write–read transaction to address 0x68.</p>
+
+<p>The expected result was:</p>
+
+<p>Transfer result: <code>I2C_ERR_NACK</code><br>
+Driver state:    <code>I2C_STATE_READY</code><br>
+SCL:             high<br>
+SDA:             high<br>
+SR2.BUSY:        clear</p>
+
+<p>The important result was not only detecting the NACK.</p>
+
+<p>The driver also completed the STOP/cleanup path and returned to READY, proving that an address NACK did not permanently lock the peripheral.</p>
+
+<p><strong>Image placement:</strong> Add the debugger screenshot showing <code>I2C_ERR_NACK</code>, <code>I2C_STATE_READY</code>, <code>GPIOB-&gt;IDR &amp; 0xC0 = 0xC0</code>, and <code>SR2 = 0</code>.</p>
+
+<p class="caption"><strong>Suggested caption:</strong> Test 1: Address NACK detected and reported without locking the driver. The bus returned to idle and the software state returned to READY.</p>
+
+<h2>11. Test 2 — Successful one-byte combined read</h2>
+
+<p>The next test read a single byte from the DS3231 seconds register.</p>
+
+<p>This specifically exercised the one-byte receive helper:</p>
+
+<p>Disable ACK before clearing ADDR<br>
+→ request STOP at the correct point<br>
+→ receive one byte</p>
+
+<p>The transaction returned:</p>
+
+<p><code>I2C_OK</code></p>
+
+<p>The state returned to:</p>
+
+<p><code>I2C_STATE_READY</code></p>
+
+<p>The raw byte was a valid BCD seconds value.</p>
+
+<p>For example:</p>
+
+<p>Raw decimal display: 85<br>
+Hexadecimal:         0x55<br>
+BCD interpretation:   55 seconds</p>
+
+<p>This test confirmed that the debugger’s decimal representation should not be mistaken for the RTC’s actual time format.</p>
+
+<h2>12. Test 3 — Successful seven-byte combined read</h2>
+
+<p>The seven-byte test read the complete RTC time/date register block.</p>
+
+<p>This exercised the N-byte receive path, including:</p>
+
+<ul>
+    <li>Intermediate-byte ACK generation</li>
+    <li>RXNE-based reception</li>
+    <li>Final-three-byte handling</li>
+    <li>BTF sequencing</li>
+    <li>Correct final NACK and STOP generation</li>
+</ul>
+
+<p>The transaction returned <code>I2C_OK</code>, all seven bytes were transferred, and the driver returned to READY.</p>
+
+<p>This was important because successful one-byte reception does not prove that the multi-byte tail sequence is correct.</p>
+
+<h2>13. Test 4 — Successful two-byte combined read</h2>
+
+<p>The two-byte test read seconds and minutes.</p>
+
+<p>The returned bytes were:</p>
+
+<p>0x16<br>
+0x06</p>
+
+<p>Interpreted as BCD:</p>
+
+<p>16 seconds<br>
+06 minutes</p>
+
+<p>The transaction completed with:</p>
+
+<p><code>I2C_OK</code><br>
+<code>I2C_STATE_READY</code><br>
+GPIO IDR mask = 0xC0<br>
+SR2 = 0x00</p>
+
+<p>This test independently validated the dedicated two-byte POS/ACK/BTF sequence.</p>
+
+<p class="caption"><strong>Image placement:</strong> Add the debugger screenshot showing the two returned bytes and final READY state.</p>
+
+<h2>14. Test 5 — Separate write and read operations</h2>
+
+<p>The combined operation was not the only API path tested.</p>
+
+<p>The application first used <code>i2c_write()</code> to set the DS3231 register pointer to 0x00, and then issued an independent <code>i2c_read()</code>.</p>
+
+<p>Both calls completed successfully:</p>
+
+<p>Write status: <code>I2C_OK</code><br>
+State after write: <code>I2C_STATE_READY</code><br>
+<br>
+Read status: <code>I2C_OK</code><br>
+State after read: <code>I2C_STATE_READY</code></p>
+
+<p>The read returned a valid BCD seconds value.</p>
+
+<p>This proved that the standalone transmit and standalone receive APIs were independently usable, not just the combined wrapper.</p>
+
+<h2>15. Test 6 — NACK handling across separate operations</h2>
+
+<p>The SDA connection was disconnected again.</p>
+
+<p>This time the application called:</p>
+
+<p><code>i2c_write()</code></p>
+
+<p>followed by:</p>
+
+<p><code>i2c_read()</code></p>
+
+<p>Both returned:</p>
+
+<p><code>I2C_ERR_NACK</code></p>
+
+<p>After each failed transaction, the driver returned to:</p>
+
+<p><code>I2C_STATE_READY</code></p>
+
+<p>This demonstrated that a NACK during one independent operation did not poison the next API call.</p>
+
+<h2>16. Test 7 — Runtime recovery from a physically stuck SDA line</h2>
+
+<p>This was the most important fault-injection test.</p>
+
+<p>The RTC remained connected normally, but PB7/SDA was temporarily pulled to ground through a resistor.</p>
+
+<p>The complete sequence was:</p>
+
+<p>Normal initialized system<br>
+→ force SDA low<br>
+→ attempt combined transaction<br>
+→ transaction fails<br>
+→ driver enters ERROR<br>
+→ call recovery while SDA is still low<br>
+→ recovery must fail<br>
+→ release SDA<br>
+→ call recovery again<br>
+→ recovery must succeed<br>
+→ perform another RTC transaction<br>
+→ transaction must succeed</p>
+
+<p>No MCU reset, power cycle, or debugger restart was allowed between the fault and the recovery.</p>
+
+<h3>16.1 Fault present</h3>
+
+<p>With SDA forced low:</p>
+
+<p>GPIOB-&gt;IDR &amp; 0xC0 = 0x40<br>
+I2C1-&gt;SR2         = 0x02</p>
+
+<p>This represented:</p>
+
+<p>SCL high<br>
+SDA low<br>
+BUSY asserted</p>
+
+<p>The transfer returned:</p>
+
+<p><code>I2C_ERR_BUS</code></p>
+
+<p>The driver entered:</p>
+
+<p><code>I2C_STATE_ERROR</code></p>
+
+<h3>16.2 Recovery attempted while the fault remained</h3>
+
+<p>While SDA was still low:</p>
+
+<p><code>i2c_recover()</code> → <code>I2C_ERR_BUS</code></p>
+
+<p>The state remained:</p>
+
+<p><code>I2C_STATE_ERROR</code></p>
+
+<p>This was essential. A recovery function must not claim success while the physical reason for the fault still exists.</p>
+
+<h3>16.3 Fault released</h3>
+
+<p>The temporary SDA-to-ground resistor was removed while the debugger remained attached and the MCU was not reset.</p>
+
+<p>The GPIO input then showed:</p>
+
+<p>GPIOB-&gt;IDR &amp; 0xC0 = 0xC0</p>
+
+<p>Both lines were high.</p>
+
+<p>The second recovery attempt returned:</p>
+
+<p><code>I2C_OK</code></p>
+
+<p>The state returned to:</p>
+
+<p><code>I2C_STATE_READY</code></p>
+
+<p>A subsequent two-byte RTC read also returned:</p>
+
+<p><code>I2C_OK</code></p>
+
+<p>The final state remained:</p>
+
+<p><code>I2C_STATE_READY</code></p>
+
+<p>This proved the complete runtime path:</p>
+
+<p>Physical fault<br>
+→ transaction failure<br>
+→ ERROR state<br>
+→ failed recovery while fault remains<br>
+→ fault removed<br>
+→ successful peripheral recovery<br>
+→ READY state<br>
+→ successful post-recovery transaction</p>
+
+<p><strong>Image placement:</strong> Use two screenshots side by side.</p>
+<p>Left: fault active, IDR = 0x40, transfer error, state ERROR<br>
+Right: fault removed, recovery I2C_OK, post-recovery transfer I2C_OK, state READY</p>
+
+<p class="caption"><strong>Suggested caption:</strong> Test 7: Hardware fault injection and runtime recovery. Left: SDA physically held low, bus error detected, and recovery rejected. Right: SDA released, recovery completed, and the following RTC transaction succeeded without resetting the MCU.</p>
+
+<h2>17. Test 8 — 10,000 consecutive combined transfers</h2>
+
+<p>After functional and fault-path testing, I ran a repeated-transfer stress test.</p>
+
+<p>The test performed 10,000 two-byte combined reads:</p>
+
+<pre><code>while (g_test_count < 10000U) 
+{ 
+   uint8_t register_address = 
+       DS3231_SECONDS_REGISTER; 
+ 
+   uint8_t rtc_data[2] = {0U}; 
+ 
+   g_last_status = i2c_write_read( 
+       DS3231_I2C_ADDRESS, 
+       &register_address, 
+       1U, 
+       rtc_data, 
+       2U); 
+ 
+   g_test_count++; 
+ 
+   if (g_last_status == I2C_OK) 
+   { 
+       g_ok_count++; 
+   } 
+   else 
+   { 
+       g_error_count++; 
+       break; 
+   } 
+}</code></pre>
+
+<p>The final debugger values were:</p>
+
+<p>g_test_count  = 10000<br>
+g_ok_count    = 10000<br>
+g_error_count = 0<br>
+g_last_status = I2C_OK<br>
+g_final_state = I2C_STATE_READY</p>
+
+<p>This did not prove every possible electrical or timing condition.</p>
+
+<p>It did, however, demonstrate that repeated START, receive completion, STOP generation, and state restoration remained consistent across 10,000 consecutive hardware transactions.</p>
+
+<p class="caption"><strong>Suggested caption:</strong> Test 8: 10,000 consecutive combined write–read transactions completed successfully with zero errors and the driver remaining in READY.</p>
+
+<h2>18. Test 9 — Defensive parameter validation</h2>
+
+<p>The final test checked whether invalid API requests were rejected before they could affect the peripheral or corrupt the driver state.</p>
+
+<p>The application tested:</p>
+
+<pre><code>i2c_write( 
+   DS3231_I2C_ADDRESS, 
+   NULL, 
+   1U); 
+ 
+i2c_read( 
+   DS3231_I2C_ADDRESS, 
+   NULL, 
+   1U); 
+ 
+i2c_write_read( 
+   DS3231_I2C_ADDRESS, 
+   NULL, 
+   1U, 
+   rtc_data, 
+   2U); 
+ 
+i2c_write_read( 
+   DS3231_I2C_ADDRESS, 
+   &register_address, 
+   1U, 
+   NULL, 
+   2U);</code></pre>
+
+<p>All four calls returned:</p>
+
+<p><code>I2C_ERR_PARAM</code></p>
+
+<p>The final driver state was:</p>
+
+<p><code>I2C_STATE_READY</code></p>
+
+<p>This confirmed that:</p>
+
+<ul>
+    <li>Invalid pointers were rejected</li>
+    <li>No transfer was started</li>
+    <li>The state machine was not disturbed</li>
+    <li>The driver remained available for valid operations</li>
+</ul>
+
+<p>The parameter checks are implemented at the entry to the public APIs before transaction ownership is acquired.</p>
+
+<p class="caption"><strong>Suggested caption:</strong> Image placement: Add the screenshot showing all four I2C_ERR_PARAM results and I2C_STATE_READY.</p>
+
+<h2>19. Consolidated verification results</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Test</th>
+            <th>Verification objective</th>
+            <th>Result</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>Recoverable NACK during combined write–read</td><td>Pass</td></tr>
+        <tr><td>2</td><td>One-byte combined read</td><td>Pass</td></tr>
+        <tr><td>3</td><td>Seven-byte/N-byte combined read</td><td>Pass</td></tr>
+        <tr><td>4</td><td>Two-byte combined read</td><td>Pass</td></tr>
+        <tr><td>5</td><td>Independent write followed by independent read</td><td>Pass</td></tr>
+        <tr><td>6</td><td>NACK handling across separate operations</td><td>Pass</td></tr>
+        <tr><td>7</td><td>Stuck-SDA fault detection and runtime recovery</td><td>Pass</td></tr>
+        <tr><td>8</td><td>10,000 consecutive combined transfers</td><td>Pass</td></tr>
+        <tr><td>9</td><td>Invalid-parameter rejection without state corruption</td><td>Pass</td></tr>
+    </tbody>
+</table>
+
+<h2>20. What the testing changed in the design</h2>
+
+<p>The verification phase did more than confirm the implementation. It sharpened several architectural decisions.</p>
+
+<h3>20.1 A NACK should not automatically become a permanent error</h3>
+
+<p>A target NACK is often recoverable.</p>
+
+<p>Locking the entire driver after every NACK would make normal device absence or address probing unnecessarily disruptive.</p>
+
+<p>The final implementation distinguishes:</p>
+
+<p>Transaction failed, but cleanup succeeded</p>
+
+<p>from:</p>
+
+<p>Transaction failed, and the bus state is uncertain</p>
+
+<p>That distinction makes the API more useful to the application layer.</p>
+
+<h3>20.2 READY must mean both software-ready and hardware-idle</h3>
+
+<p>A state variable alone cannot prove that the physical bus is usable.</p>
+
+<p>The driver therefore checks SR2.BUSY when admitting a new operation.</p>
+
+<h3>20.3 Recovery must be tested against a physical fault</h3>
+
+<p>Calling <code>i2c_recover()</code> on a healthy bus proves very little.</p>
+
+<p>The meaningful test was:</p>
+
+<p>Force SDA low<br>
+→ confirm recovery fails<br>
+→ release SDA<br>
+→ confirm recovery succeeds<br>
+→ confirm the next transaction works</p>
+
+<h3>20.4 Completion means more than receiving the last byte</h3>
+
+<p>A transaction is not complete merely because the final data register was read.</p>
+
+<p>The driver verifies that STOP has completed and the bus has returned to a defined idle condition before it changes the state back to READY.</p>
+
+<h3>20.5 Length-specific paths deserve independent tests</h3>
+
+<p>A working seven-byte read does not prove a one-byte read, and a working one-byte read does not prove the two-byte POS/BTF sequence.</p>
+
+<p>Each path needed its own hardware test.</p>
+
+<h2>21. Current limitations</h2>
+
+<p>The polling version is now a useful reference implementation, but it is not the final gateway driver.</p>
+
+<p>Its main limitations are:</p>
+
+<p><strong>Blocking execution</strong></p>
+
+<p>The CPU waits for each I²C hardware event.</p>
+
+<p>This is acceptable for early bring-up and very short transactions, but it does not scale well when the gateway must service multiple peripherals and communication interfaces.</p>
+
+<p><strong>Software-loop timeout</strong></p>
+
+<p>The timeout is based on iteration count rather than an absolute time source.</p>
+
+<p>The next implementation should use a hardware timer or monotonic system tick.</p>
+
+<p><strong>Single execution context</strong></p>
+
+<p>The V1 driver is not reentrant and must not be called from an ISR.</p>
+
+<p><strong>Recovery scope</strong></p>
+
+<p>The current recovery resets and reconfigures the I²C peripheral and verifies that the bus becomes idle.</p>
+
+<p>It does not yet perform a full GPIO-based bus-clear sequence with multiple SCL pulses. Such a sequence may be required when a target device remains internally stuck and continues holding SDA low after the original fault source has been removed.</p>
+
+<p><strong>Single-controller assumptions</strong></p>
+
+<p>The current admission policy interprets an unexpected BUSY condition as a stuck or inconsistent bus.</p>
+
+<p>A genuine multi-controller design would need different arbitration and ownership rules.</p>
+
+<p><strong>Logic-level protocol capture</strong></p>
+
+<p>Register inspection and hardware fault injection formed the main evidence for this phase. A formal logic-analyser capture and decoded timing report can still be added as supplementary protocol-level evidence.</p>
+
+<h2>22. The next phase: interrupt-driven I²C</h2>
+
+<p>The verified polling implementation will now be frozen as a reference baseline.</p>
+
+<p>The next version will use:</p>
+
+<pre><code>I2C1_EV_IRQHandler(); 
+I2C1_ER_IRQHandler();</code></pre>
+
+<p>The application will start an operation and return immediately:</p>
+
+<pre><code>status = i2c_write_read_it( 
+   DS3231_I2C_ADDRESS, 
+   &register_address, 
+   1U, 
+   rtc_data, 
+   2U);</code></pre>
+
+<p>The event interrupt will advance the transaction through stages such as:</p>
+
+<p>START generated<br>
+→ address phase<br>
+→ transmit bytes<br>
+→ repeated START<br>
+→ receive bytes<br>
+→ STOP<br>
+→ completion</p>
+
+<p>The error interrupt will classify:</p>
+
+<ul>
+    <li>NACK</li>
+    <li>Bus error</li>
+    <li>Arbitration lost</li>
+    <li>Overrun</li>
+    <li>Other peripheral errors</li>
+</ul>
+
+<p>The development order will be:</p>
+
+<p>Interrupt-driven write<br>
+→ one-byte read<br>
+→ two-byte read<br>
+→ N-byte read<br>
+→ combined write–read<br>
+→ error ISR<br>
+→ timer-based timeout supervision<br>
+→ runtime recovery<br>
+→ regression against the polling-driver tests</p>
+
+<p>DMA is not required for the first interrupt-driven implementation.</p>
+
+<p>The current DS3231 transactions are only a few bytes long. Interrupt-driven operation will remove the blocking behaviour while keeping the transaction state observable.</p>
+
+<p>DMA can be considered later for larger or continuously streamed data, particularly on interfaces such as UART, SPI, external storage, or high-rate sensor acquisition.</p>
+
+<h2>23. Closing thoughts</h2>
+
+<p>A peripheral driver is not complete when the first valid byte appears in a debugger.</p>
+
+<p>It becomes trustworthy when its behaviour is defined and tested across:</p>
+
+<ul>
+    <li>Normal operation</li>
+    <li>Boundary-length transfers</li>
+    <li>Repeated transactions</li>
+    <li>Target absence</li>
+    <li>Bus faults</li>
+    <li>Recovery attempts</li>
+    <li>Invalid application requests</li>
+    <li>Post-error operation</li>
+</ul>
+
+<p>The most valuable result from this phase was not that the DS3231 returned the correct seconds value.</p>
+
+<p>It was that the driver demonstrated a repeatable lifecycle:</p>
+
+<p>RESET<br>
+→ READY<br>
+→ BUSY<br>
+→ successful completion<br>
+→ READY</p>
+
+<p>and, under a physical fault:</p>
+
+<p>RESET / BUSY<br>
+→ ERROR<br>
+→ failed recovery while fault remains<br>
+→ successful recovery after fault removal<br>
+→ READY<br>
+→ successful next transaction</p>
+
+<p>That verified polling implementation now provides a stable behavioural reference for the interrupt-driven architecture that follows.</p>
+
+</body>
+</html>
