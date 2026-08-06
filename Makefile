@@ -45,6 +45,7 @@ C_OBJS = $(BUILD_DIR)/main.o \
 		 $(BUILD_DIR)/frame_manager.o \
          $(BUILD_DIR)/uart_driver.o \
          $(BUILD_DIR)/i2c_driver.o \
+         $(BUILD_DIR)/i2c_driver_it.o \
          $(BUILD_DIR)/dma_driver.o \
          $(BUILD_DIR)/system_stm32f4xx.o
 
@@ -90,6 +91,10 @@ $(BUILD_DIR)/uart_driver.o: drivers/peripheral/uart/uart_driver.c
 
 $(BUILD_DIR)/i2c_driver.o: drivers/peripheral/i2c/src/i2c_driver.c
 	@echo "  CC  drivers/peripheral/i2c/src/i2c_driver.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/i2c_driver_it.o: drivers/peripheral/i2c/src/i2c_driver_it.c
+	@echo "  CC  drivers/peripheral/i2c/src/i2c_driver_it.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/dma_driver.o: drivers/peripheral/dma/src/dma_driver.c
