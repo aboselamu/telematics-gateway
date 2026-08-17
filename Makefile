@@ -23,6 +23,7 @@ INCLUDES = -Iapp/inc \
 		   -Imiddleware/frame_manager/inc \
            -Idrivers/peripheral/uart \
            -Idrivers/peripheral/i2c/inc \
+		   -Idrivers/device/ds3231/inc \
 		   -Itests/hil/I2C_Int_Queue/inc \
            -Idrivers/peripheral/dma/inc \
            -Iplatform/inc \
@@ -67,7 +68,7 @@ C_OBJS = $(BUILD_DIR)/main.o \
          $(BUILD_DIR)/uart_driver.o \
          $(BUILD_DIR)/i2c_driver.o \
          $(BUILD_DIR)/i2c_driver_it.o \
-         $(BUILD_DIR)/i2c_interrupt_hil.o \
+		 $(BUILD_DIR)/ds3231.o \
          $(BUILD_DIR)/dma_driver.o \
          $(BUILD_DIR)/system_stm32f4xx.o
 
@@ -117,6 +118,10 @@ $(BUILD_DIR)/i2c_driver.o: drivers/peripheral/i2c/src/i2c_driver.c
 
 $(BUILD_DIR)/i2c_driver_it.o: drivers/peripheral/i2c/src/i2c_driver_it.c
 	@echo "  CC  drivers/peripheral/i2c/src/i2c_driver_it.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/ds3231.o: drivers/device/ds3231/src/ds3231.c
+	@echo "  CC  drivers/device/ds3231/src/ds3231.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/i2c_interrupt_hil.o: tests/hil/I2C_Int_Queue/src/i2c_interrupt_hil.c

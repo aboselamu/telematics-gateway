@@ -1,118 +1,349 @@
 # Telematic Gateway (TG)
 
-> **A production-oriented bare-metal embedded firmware platform built on
-> STM32F446RE using CMSIS register-level programming.**
+> **A bare-metal embedded firmware platform for STM32F446RE, developed with CMSIS register-level programming and verified incrementally on real hardware.**
 
-The **Telematic Gateway (TG)** is a long-term embedded systems project
-focused on designing reusable, production-quality firmware architectures
-rather than isolated peripheral demonstrations.
+The **Telematic Gateway (TG)** is a long-term embedded systems project focused on building a reusable firmware architecture rather than a collection of isolated peripheral demonstrations.
 
-Instead of simply implementing UART, SPI, I²C or CAN drivers, this
-project emphasizes software architecture, modularity, deterministic
-state machines, hardware abstraction, and Hardware-in-the-Loop (HIL)
-verification.
+The project is developed incrementally from low-level peripheral drivers through device drivers, middleware, services, and eventually gateway functionality. Each subsystem is given clear ownership boundaries, explicit state and error semantics, and Hardware-in-the-Loop (HIL) verification before the next layer is added.
 
-Every component is developed incrementally and validated on real
-hardware before becoming part of the platform.
+The current platform is intentionally **bare-metal**: no STM32 HAL and no LL drivers.
+
+---
 
 ## Why This Project Exists
 
-Many embedded repositories demonstrate how to make a peripheral work.
+Many embedded examples stop when a peripheral can transmit or receive data.
 
-This project demonstrates how professional firmware is engineered.
+TG focuses on what comes after bring-up:
 
-### Focus Areas
+- Who owns an asynchronous transaction after an API returns?
+- Where does state live while hardware continues running?
+- How should interrupt completion cross software layers?
+- Which failures belong to the transport, device, middleware, or application?
+- How can a subsystem be verified on real hardware before the architecture grows?
 
--   Reusable drivers
--   Layered architecture
--   Deterministic execution
--   Maintainability
--   Scalability
--   Hardware-in-the-Loop validation
+The objective is to make those decisions explicit and repeatable.
 
-## Design Philosophy
+---
 
-> Correct architecture is more valuable than working code that cannot
-> evolve.
+## Architecture
 
-### Driver Architecture
+```text
+Application / Gateway Services
+            │
+            ▼
+      Device / Sensor Services
+            │
+            ▼
+          Middleware
+  ┌─────────┼──────────────┐
+  │         │              │
+Frame    Protocol       Event Queue
+Manager  Parsers
+            │
+            ▼
+        Device Drivers
+      ┌─────┴─────┐
+      │           │
+   DS3231      Future Devices
+      │
+      ▼
+     Peripheral Drivers
+  ┌────┬────┬────┬────┐
+ UART DMA   I²C  CAN
+  └────┴────┴────┴────┘
+            │
+            ▼
+   CMSIS Register Layer
+            │
+            ▼
+      STM32F446RE
+```
 
-``` text
+### Peripheral Driver Pattern
+
+```text
 Public API
     │
     ▼
-Transaction Managers
+Transaction / State Management
     │
     ▼
-Primitive Workers
+Interrupt or Polling Progression
+    │
+    ▼
+Primitive Register Operations
     │
     ▼
 STM32 Registers
 ```
 
-Public APIs validate parameters and dispatch transactions.
+Public APIs validate requests and establish ownership.
 
-Transaction Managers implement protocol sequences.
+Transaction/state logic preserves context across asynchronous execution.
 
-Primitive Workers perform exactly one hardware operation.
+Primitive workers perform narrowly scoped hardware operations.
+
+---
 
 ## Engineering Principles
 
--   Bare-metal CMSIS (No HAL / No LL)
--   Single Responsibility Principle
--   Separation of Policy and Mechanism
--   Deterministic State Machines
--   Centralized Error Handling
--   Reusable Driver Interfaces
+- Bare-metal CMSIS register-level development
+- No HAL / No LL
+- Clear ownership of asynchronous operations
+- Separation of policy and mechanism
+- Explicit state machines
+- Small ISR responsibilities
+- Layer-independent peripheral drivers
+- Device-specific logic outside transport drivers
+- Centralized status and error handling
+- Hardware-in-the-Loop verification
+- Deliberate v1 scope and documented hardening backlog
+
+---
+
+## Asynchronous Completion Model
+
+The I²C work established the completion pattern used by the platform:
+
+```text
+Peripheral Hardware
+        │
+        ▼
+       ISR
+        │
+        ▼
+Transaction Completion
+        │
+        ▼
+     Callback
+        │
+        ▼
+    Event Queue
+        │
+        ▼
+Device / Application Layer
+```
+
+The peripheral driver does **not** depend directly on middleware. Completion crosses the layer boundary through a small callback contract, while deferred processing happens outside interrupt context.
+
+A useful rule from the I²C implementation is:
+
+> **The peripheral driver understands the bus.  
+> The device driver understands the device.  
+> The application should understand the information it needs.**
+
+---
 
 ## Project Progress
 
-### Phase 0 & 1 --- Foundation ✅
+### Phase 0 & 1 — Foundation ✅
 
--   Software Architecture
--   Coding Standards
--   Event Queue
--   Ring Buffer
+- Software architecture
+- Coding conventions
+- Event queue
+- Ring buffer
+- Repository/build structure
 
-### Phase 2 & 3 --- UART, DMA & Streaming Middleware ✅
+### Phase 2 & 3 — UART, DMA & Streaming Middleware ✅
 
--   UART Driver
--   DMA Circular Reception
--   Frame Builder
--   Frame Manager
--   Protocol Parser
--   GPS Decoder
--   End-to-End HIL Validation
+- UART driver
+- DMA circular reception
+- UART refactor for DMA integration
+- Frame Builder
+- Frame Manager
+- Protocol Parser
+- GPS Decoder
+- End-to-End streaming HIL validation
 
-### Phase 4 --- I²C Driver ✅
+### Phase 4 — Sensor Middleware / I²C ✅
 
--   Polling Master Driver
--   Read / Write Transactions
--   Repeated START
--   Transaction Managers
--   Primitive Workers
--   RM0390 Event Sequencing
--   HIL Validation
+#### I²C transport
 
-### Planned
+- Polling master driver
+- Interrupt-driven non-blocking master driver
+- Standalone write and read
+- Combined write-read
+- Repeated START
+- 1-byte, 2-byte and multi-byte receive paths
+- Transaction state separated from protocol phase
+- NACK handling
+- BUSY-path handling
+- Callback-based completion boundary
+- Event queue integration
 
--   SPI Driver
--   CAN Driver
--   RTOS Integration
--   Gateway Services
--   Cloud Connectivity
+#### DS3231 device layer
+
+- Asynchronous time read
+- Asynchronous time write
+- BCD encode/decode
+- 12/24-hour decode handling
+- Date/time validation
+- Device-level state machine
+- Write/read-back verification on real hardware
+
+#### HIL results
+
+Interrupt-driven I²C verification:
+
+```text
+HIL tests passed:             9
+HIL tests failed:             0
+Stress transactions:    10,000 / 10,000
+Event-post failures:          0
+Final transport result:  I2C_OK
+```
+
+DS3231 verification:
+
+```text
+Async write:            PASS
+Async read:             PASS
+Write/read-back:        PASS
+BCD encode/decode:      PASS
+Device state flow:      PASS
+Callback/event path:    PASS
+```
+
+These results describe the completed HIL campaign and its defined test scope; they are not a blanket reliability claim.
+
+### Phase 5 — CAN Communication Subsystem 🚧
+
+Current next milestone:
+
+- CAN controller bring-up and bit timing
+- Multi-node CAN TX/RX baseline
+- Interrupt-driven CAN and event integration
+- Acceptance filtering
+- Error-state handling
+- Error-passive / bus-off detection
+- Bus-off recovery
+- Multi-node CAN HIL verification
+- CAN v1 freeze after defined verification scope passes
+
+The initial CAN scope is intentionally limited to **Classic CAN, 11-bit identifiers, data frames, and a small multi-node bench** before higher-level protocols are introduced.
+
+### Later Phases
+
+- SPI integration
+- Gateway services
+- RTOS integration
+- Higher-level CAN protocols as required
+- Diagnostics
+- Cloud / external gateway connectivity
+
+---
+
+## Current CAN Test Direction
+
+The next hardware stage is a real multi-node CAN bench rather than loopback-only testing.
+
+Planned topology:
+
+```text
+STM32F446RE
+    │
+CAN Controller
+    │
+CAN Transceiver
+    │
+    ├──────── CANH ────────────────────────┐
+    └──────── CANL ────────────────────────┤
+                                           │
+Additional MCU Node                        │
+    │                                      │
+CAN Transceiver                            │
+    │                                      │
+    ├──────── CANH ────────────────────────┤
+    └──────── CANL ────────────────────────┤
+                                           │
+Independent CAN Observer / Third Node ─────┘
+```
+
+The HIL campaign will grow progressively from basic frame exchange into filtering, arbitration, induced errors, bus-off/recovery, and stress traffic.
+
+---
+
+## Verification Strategy
+
+Verification is split according to what is being tested:
+
+```text
+Pure computation
+      │
+      ▼
+ Unit Tests
+
+Peripheral / Device Interaction
+      │
+      ▼
+     HIL
+
+Complete asynchronous subsystem
+      │
+      ▼
+Integration HIL
+```
+
+Examples of pure computation include BCD conversion, scaling, CRC, packet decoding, and range validation.
+
+Hardware-dependent behaviour such as interrupt sequencing, bus timing, NACK handling, peripheral status flags, and physical-device interaction belongs in HIL.
+
+---
 
 ## Hardware Platform
 
--   STM32F446RE
--   ARM Cortex-M4
--   STM32CubeIDE
--   CMSIS
--   ST-Link V2/V3
+Primary platform:
 
-## Long-Term Vision
+- STM32F446RE
+- ARM Cortex-M4
+- STM32 Nucleo development board
+- CMSIS
+- ST-Link
+- GCC / `arm-none-eabi-gcc`
 
-The goal of this repository is to demonstrate how production embedded
-firmware is architected from low-level peripheral drivers through
-middleware, services, and gateway functionality while validating every
-subsystem using real hardware.
+Current verified peripheral hardware includes:
+
+- DS3231 RTC
+- I²C bench wiring and HIL setup
+
+CAN hardware is being expanded into a multi-node bench using external CAN transceivers.
+
+---
+
+## Repository Direction
+
+The repository is intended to evolve from low-level hardware access toward a complete gateway architecture while keeping subsystem boundaries visible.
+
+The guiding progression is:
+
+```text
+Make the hardware work
+        ↓
+Define ownership
+        ↓
+Make execution asynchronous
+        ↓
+Make failure semantics explicit
+        ↓
+Integrate through clean boundaries
+        ↓
+Verify on real hardware
+        ↓
+Freeze the verified scope
+        ↓
+Move upward in the architecture
+```
+
+The goal is not to maximize the number of supported peripherals.
+
+The goal is to build a firmware platform in which each new subsystem is easier to reason about because the boundaries established by the previous one remain clear.
+
+---
+
+## Status
+
+**Current completed milestone:** Interrupt-driven I²C + DS3231 device layer with HIL verification.
+
+**Current development milestone:** Multi-node CAN communication subsystem.
+

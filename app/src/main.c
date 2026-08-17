@@ -5,28 +5,71 @@
 #include "i2c_driver_it.h"
 
 #include "event_queue.h"
-#include "i2c_interrupt_hil.h"
+#include "ds3231.h"
 
 
 /*=============================================================================
  * Debug / HIL Observation
  *============================================================================*/
 
-/*
- * These mirrors make the final HIL result easy to inspect
- * from the debugger without exposing test internals.
- */
-volatile uint32_t g_i2c_hil_done = 0U;
-volatile uint32_t g_i2c_hil_tests_passed = 0U;
-volatile uint32_t g_i2c_hil_tests_failed = 0U;
-volatile uint32_t g_i2c_hil_stress_completed = 0U;
-volatile uint32_t g_i2c_hil_event_post_failures = 0U;
-
-volatile i2c_status_t g_i2c_hil_last_result = I2C_OK;
-volatile i2c_hil_state_t g_i2c_hil_final_state = I2C_HIL_IDLE;
-
 volatile i2c_status_t g_i2c_init_status;
 volatile event_status_t g_event_queue_init_status;
+
+
+/*=============================================================================
+ * DS3231 HIL Test State
+ *============================================================================*/
+
+typedef enum
+{
+    DS3231_TEST_WRITE = 0,
+    DS3231_TEST_WAIT_WRITE,
+    DS3231_TEST_READ,
+    DS3231_TEST_WAIT_READ,
+    DS3231_TEST_DONE,
+    DS3231_TEST_FAILED
+
+} ds3231_test_state_t;
+
+
+volatile ds3231_test_state_t g_ds3231_test_state =
+    DS3231_TEST_WRITE;
+
+volatile ds3231_status_t g_ds3231_write_status =
+    DS3231_OK;
+
+volatile ds3231_status_t g_ds3231_read_status =
+    DS3231_OK;
+
+volatile ds3231_status_t g_ds3231_get_status =
+    DS3231_ERR_DATA;
+
+volatile uint32_t g_ds3231_test_done = 0U;
+volatile uint32_t g_ds3231_test_pass = 0U;
+
+volatile uint32_t g_i2c_event_post_failures = 0U;
+
+volatile ds3231_time_t g_ds3231_readback;
+
+
+/*
+ * Known value written to the RTC and then read back.
+ *
+ * Day numbering is application-defined by the DS3231.
+ * Here:
+ *      1 = Sunday
+ */
+static const ds3231_time_t s_test_time =
+{
+    .seconds = 0U,
+    .minutes = 55U,
+    .hours   = 12U,
+
+    .day     = 1U,
+    .date    = 16U,
+    .month   = 8U,
+    .year    = 2026U
+};
 
 
 /*=============================================================================
@@ -76,6 +119,34 @@ void SystemClock_Config(void)
 
 
 /*=============================================================================
+ * I2C Completion Adapter
+ *
+ * Executes in I2C interrupt context.
+ *
+ * Keep this function very small. It only converts the driver callback into
+ * a middleware event.
+ *============================================================================*/
+
+static void i2c_completion_callback(
+    i2c_status_t result)
+{
+    event_t event = {0};
+
+    event.event_id =
+        EVT_I2C_TRANSFER_DONE;
+
+    event.param1 =
+        (uint32_t)result;
+
+    if (eventQueue_post(&event) !=
+        EVENT_QUEUE_OK)
+    {
+        g_i2c_event_post_failures++;
+    }
+}
+
+
+/*=============================================================================
  * Main
  *============================================================================*/
 
@@ -83,26 +154,23 @@ int main(void)
 {
     const i2c_config_t i2c_config =
     {
-        .clock_speed = I2C_CLOCK_STANDARD_SAFE_HZ
+        .clock_speed =
+            I2C_CLOCK_STANDARD_SAFE_HZ
     };
 
     event_t event;
 
-    const i2c_hil_report_t *p_report;
 
-
-    /*----------------------------------------------------------
-     * 1. MCU clock
-     *---------------------------------------------------------*/
+    /*=========================================================================
+     * 1. MCU Clock
+     *========================================================================*/
 
     SystemClock_Config();
 
 
-    /*----------------------------------------------------------
-     * 2. Physical I2C peripheral
-     *
-     * Existing, already HIL-verified configuration.
-     *---------------------------------------------------------*/
+    /*=========================================================================
+     * 2. I2C Peripheral Layer
+     *========================================================================*/
 
     g_i2c_init_status =
         i2c_init(&i2c_config);
@@ -116,14 +184,15 @@ int main(void)
     }
 
 
-    /*----------------------------------------------------------
+    /*=========================================================================
      * 3. Middleware
-     *---------------------------------------------------------*/
+     *========================================================================*/
 
     g_event_queue_init_status =
         eventQueue_init();
 
-    if (g_event_queue_init_status != EVENT_QUEUE_OK)
+    if (g_event_queue_init_status !=
+        EVENT_QUEUE_OK)
     {
         while (1)
         {
@@ -132,56 +201,272 @@ int main(void)
     }
 
 
-    /*----------------------------------------------------------
-     * 4. Interrupt I2C HIL
+    /*=========================================================================
+     * 4. Interrupt I2C Transport
+     *========================================================================*/
+
+    i2c_it_init();
+
+    i2c_it_register_callback(
+        i2c_completion_callback);
+
+
+    /*=========================================================================
+     * 5. DS3231 Device Layer
+     *========================================================================*/
+
+    ds3231_init();
+
+
+    /*=========================================================================
+     * 6. HIL Test - Start WRITE
      *
-     * Internally:
-     *
-     * i2c_interrupt_hil_init()
-     *      -> i2c_it_init()
-     *      -> registers I2C completion callback
-     *---------------------------------------------------------*/
+     * Write a known date/time first. The READ is started only after the
+     * asynchronous WRITE completion event has been processed.
+     *========================================================================*/
 
-    i2c_interrupt_hil_init();
+    g_ds3231_write_status =
+        ds3231_set_time_async(&s_test_time);
 
-    i2c_interrupt_hil_start();
+    if (g_ds3231_write_status == DS3231_OK)
+    {
+        g_ds3231_test_state =
+            DS3231_TEST_WAIT_WRITE;
+    }
+    else
+    {
+        g_ds3231_test_state =
+            DS3231_TEST_FAILED;
+
+        g_ds3231_test_pass = 0U;
+        g_ds3231_test_done = 1U;
+    }
 
 
-    /*----------------------------------------------------------
-     * 5. Cooperative super-loop
-     *---------------------------------------------------------*/
+    /*=========================================================================
+     * Cooperative Super-loop
+     *========================================================================*/
 
     while (1)
     {
-        /*
-         * Launch pending I2C HIL transactions.
+        /*---------------------------------------------------------------------
+         * Detect an event-queue failure.
          *
-         * This never blocks waiting for the transfer.
-         */
-        i2c_interrupt_hil_process();
+         * A lost completion event would otherwise leave the device-driver
+         * state machine waiting indefinitely.
+         *--------------------------------------------------------------------*/
+
+        if ((g_i2c_event_post_failures != 0U) &&
+            (g_ds3231_test_done == 0U))
+        {
+            g_ds3231_test_state =
+                DS3231_TEST_FAILED;
+
+            g_ds3231_test_pass = 0U;
+            g_ds3231_test_done = 1U;
+        }
 
 
-        /*
-         * Drain middleware events.
-         */
+        /*---------------------------------------------------------------------
+         * Launch READ after WRITE completion.
+         *
+         * The WRITE completion event only schedules this state.
+         * The next transaction is started here in normal thread context.
+         *--------------------------------------------------------------------*/
+
+        if (g_ds3231_test_state ==
+            DS3231_TEST_READ)
+        {
+            g_ds3231_read_status =
+                ds3231_read_time_async();
+
+            if (g_ds3231_read_status ==
+                DS3231_OK)
+            {
+                g_ds3231_test_state =
+                    DS3231_TEST_WAIT_READ;
+            }
+            else if (g_ds3231_read_status ==
+                     DS3231_BUSY)
+            {
+                /*
+                 * The previous STOP may not yet have released the physical bus.
+                 * Stay in DS3231_TEST_READ and retry on a later super-loop pass.
+                 */
+            }
+            else
+            {
+                g_ds3231_test_state =
+                    DS3231_TEST_FAILED;
+
+                g_ds3231_test_pass = 0U;
+                g_ds3231_test_done = 1U;
+            }
+        }
+
+
+        /*---------------------------------------------------------------------
+         * Middleware Event Dispatcher
+         *--------------------------------------------------------------------*/
+
         while (eventQueue_poll(&event) ==
                EVENT_QUEUE_OK)
         {
             switch (event.event_id)
             {
-                case EVT_I2C_TRANSFER_DONE:
+                /*-------------------------------------------------------------
+                 * I2C transaction completed.
+                 *------------------------------------------------------------*/
 
-                    i2c_interrupt_hil_handle_event(
-                        &event);
+                case EVT_I2C_TRANSFER_DONE:
+                {
+                    i2c_status_t result =
+                        (i2c_status_t)
+                            event.param1;
+
+
+                    /*
+                     * First allow the DS3231 device driver to process
+                     * the completed transport transaction.
+                     */
+                    ds3231_on_i2c_complete(
+                        result);
+
+
+                    /*---------------------------------------------------------
+                     * WRITE completion
+                     *--------------------------------------------------------*/
+
+                    if (g_ds3231_test_state ==
+                        DS3231_TEST_WAIT_WRITE)
+                    {
+                        if ((result != I2C_OK) ||
+                            (ds3231_get_state() !=
+                             DS3231_STATE_IDLE))
+                        {
+                            g_ds3231_test_state =
+                                DS3231_TEST_FAILED;
+
+                            g_ds3231_test_pass = 0U;
+                            g_ds3231_test_done = 1U;
+
+                            break;
+                        }
+
+
+                        /*
+                         * Do not start the READ directly here.
+                         *
+                         * Schedule it for the normal super-loop.
+                         */
+                        g_ds3231_test_state =
+                            DS3231_TEST_READ;
+
+                        break;
+                    }
+
+
+                    /*---------------------------------------------------------
+                     * READ completion
+                     *--------------------------------------------------------*/
+
+                    if (g_ds3231_test_state ==
+                        DS3231_TEST_WAIT_READ)
+                    {
+                        ds3231_time_t time;
+
+
+                        if ((result != I2C_OK) ||
+                            (ds3231_get_state() !=
+                             DS3231_STATE_IDLE))
+                        {
+                            g_ds3231_test_state =
+                                DS3231_TEST_FAILED;
+
+                            g_ds3231_test_pass = 0U;
+                            g_ds3231_test_done = 1U;
+
+                            break;
+                        }
+
+
+                        /*
+                         * Retrieve decoded application-level time.
+                         */
+                        g_ds3231_get_status =
+                            ds3231_get_time(
+                                &time);
+
+
+                        if (g_ds3231_get_status !=
+                            DS3231_OK)
+                        {
+                            g_ds3231_test_state =
+                                DS3231_TEST_FAILED;
+
+                            g_ds3231_test_pass = 0U;
+                            g_ds3231_test_done = 1U;
+
+                            break;
+                        }
+
+
+                        /*
+                         * Save result so it is easy to inspect using GDB.
+                         */
+                        g_ds3231_readback =
+                            time;
+
+
+                        /*
+                         * Verify write -> physical RTC -> read-back.
+                         *
+                         * Seconds are allowed to advance while the
+                         * asynchronous transactions are executing.
+                         */
+                        if ((time.seconds <= 5U) &&
+                            (time.minutes == 55U) &&
+                            (time.hours   == 12U) &&
+                            (time.day     == 1U) &&
+                            (time.date    == 16U) &&
+                            (time.month   == 8U) &&
+                            (time.year    == 2026U))
+                        {
+                            g_ds3231_test_pass =
+                                1U;
+
+                            g_ds3231_test_state =
+                                DS3231_TEST_DONE;
+                        }
+                        else
+                        {
+                            g_ds3231_test_pass =
+                                0U;
+
+                            g_ds3231_test_state =
+                                DS3231_TEST_FAILED;
+                        }
+
+
+                        g_ds3231_test_done =
+                            1U;
+
+                        break;
+                    }
+
 
                     break;
+                }
 
+
+                /*-------------------------------------------------------------
+                 * Existing UART event path
+                 *------------------------------------------------------------*/
 
                 case EVT_UART_FRAME_READY:
 
                     /*
-                     * Existing UART/frame path will
-                     * eventually live here again.
+                     * Existing UART/frame processing.
                      */
                     break;
 
@@ -195,42 +480,10 @@ int main(void)
 
 
         /*
-         * Mirror HIL result for debugger inspection.
+         * Leave the MCU running.
+         *
+         * The test result remains available through the global
+         * debugger variables.
          */
-        p_report =
-            i2c_interrupt_hil_get_report();
-
-        g_i2c_hil_tests_passed =
-            p_report->tests_passed;
-
-        g_i2c_hil_tests_failed =
-            p_report->tests_failed;
-
-        g_i2c_hil_stress_completed =
-            p_report->stress_completed;
-
-        g_i2c_hil_event_post_failures =
-            p_report->event_post_failures;
-
-        g_i2c_hil_last_result =
-            p_report->last_result;
-
-        g_i2c_hil_final_state =
-            p_report->state;
-
-
-        if (i2c_interrupt_hil_is_done())
-        {
-            g_i2c_hil_done = 1U;
-
-            /*
-             * Keep firmware alive so debugger values
-             * remain observable.
-             */
-            while (1)
-            {
-                __NOP();
-            }
-        }
     }
 }
