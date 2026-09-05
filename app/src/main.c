@@ -1,81 +1,12 @@
-#include "stm32f4xx.h"
 #include "stm32f446xx.h"
 
-#include "i2c_driver.h"
-#include "i2c_driver_it.h"
-
-#include "event_queue.h"
-#include "ds3231.h"
-
-
-/*=============================================================================
- * Debug / HIL Observation
- *============================================================================*/
-
-volatile i2c_status_t g_i2c_init_status;
-volatile event_status_t g_event_queue_init_status;
-
-
-/*=============================================================================
- * DS3231 HIL Test State
- *============================================================================*/
-
-typedef enum
-{
-    DS3231_TEST_WRITE = 0,
-    DS3231_TEST_WAIT_WRITE,
-    DS3231_TEST_READ,
-    DS3231_TEST_WAIT_READ,
-    DS3231_TEST_DONE,
-    DS3231_TEST_FAILED
-
-} ds3231_test_state_t;
-
-
-volatile ds3231_test_state_t g_ds3231_test_state =
-    DS3231_TEST_WRITE;
-
-volatile ds3231_status_t g_ds3231_write_status =
-    DS3231_OK;
-
-volatile ds3231_status_t g_ds3231_read_status =
-    DS3231_OK;
-
-volatile ds3231_status_t g_ds3231_get_status =
-    DS3231_ERR_DATA;
-
-volatile uint32_t g_ds3231_test_done = 0U;
-volatile uint32_t g_ds3231_test_pass = 0U;
-
-volatile uint32_t g_i2c_event_post_failures = 0U;
-
-volatile ds3231_time_t g_ds3231_readback;
-
-
-/*
- * Known value written to the RTC and then read back.
- *
- * Day numbering is application-defined by the DS3231.
- * Here:
- *      1 = Sunday
- */
-static const ds3231_time_t s_test_time =
-{
-    .seconds = 0U,
-    .minutes = 55U,
-    .hours   = 12U,
-
-    .day     = 1U,
-    .date    = 16U,
-    .month   = 8U,
-    .year    = 2026U
-};
-
+volatile uint16_t rx_id   = 0U;
+volatile uint8_t  rx_dlc  = 0U;
+volatile uint8_t  rx_data = 0U;
 
 /*=============================================================================
  * System Clock
  *============================================================================*/
-
 void SystemClock_Config(void)
 {
     RCC->CR |= RCC_CR_HSION;
@@ -117,373 +48,149 @@ void SystemClock_Config(void)
     }
 }
 
+void Gpio_init(void){
+        /* GPIOB clock */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
 
-/*=============================================================================
- * I2C Completion Adapter
- *
- * Executes in I2C interrupt context.
- *
- * Keep this function very small. It only converts the driver callback into
- * a middleware event.
- *============================================================================*/
+    /* PB8 = Alternate Function */
+    GPIOB->MODER &= ~(3U << 16U);
+    GPIOB->MODER |=  (2U << 16U);
 
-static void i2c_completion_callback(
-    i2c_status_t result)
-{
-    event_t event = {0};
+    /* PB8 = AF9 = CAN1_RX */
+    GPIOB->AFR[1] &= ~(0xFU << 0U);
+    GPIOB->AFR[1] |=  (9U << 0U);
 
-    event.event_id =
-        EVT_I2C_TRANSFER_DONE;
-
-    event.param1 =
-        (uint32_t)result;
-
-    if (eventQueue_post(&event) !=
-        EVENT_QUEUE_OK)
-    {
-        g_i2c_event_post_failures++;
-    }
+    /* PB8 pull-up: recessive CAN_RX */
+    GPIOB->PUPDR &= ~(3U << 16U);
+    GPIOB->PUPDR |=  (1U << 16U);
 }
-
-
-/*=============================================================================
- * Main
- *============================================================================*/
 
 int main(void)
 {
-    const i2c_config_t i2c_config =
-    {
-        .clock_speed =
-            I2C_CLOCK_STANDARD_SAFE_HZ
-    };
-
-    event_t event;
-
-
-    /*=========================================================================
-     * 1. MCU Clock
-     *========================================================================*/
-
     SystemClock_Config();
 
+    /* 1. Enable CAN1 clock */
+    RCC->APB1ENR |= RCC_APB1ENR_CAN1EN;
 
-    /*=========================================================================
-     * 2. I2C Peripheral Layer
-     *========================================================================*/
+    // Egziabiher ka'ene gar nawu= AMEN
+    Gpio_init();
 
-    g_i2c_init_status =
-        i2c_init(&i2c_config);
+    /* 2. Leave sleep mode */
+    CAN1->MCR &= ~CAN_MCR_SLEEP;
 
-    if (g_i2c_init_status != I2C_OK)
+    /* 3. Request initialization mode */
+    CAN1->MCR |= CAN_MCR_INRQ;
+
+    /* Wait until bxCAN acknowledges INIT mode */
+    while ((CAN1->MSR & CAN_MSR_INAK) == 0U)
     {
-        while (1)
-        {
-            __NOP();
-        }
+
     }
 
-
-    /*=========================================================================
-     * 3. Middleware
-     *========================================================================*/
-
-    g_event_queue_init_status =
-        eventQueue_init();
-
-    if (g_event_queue_init_status !=
-        EVENT_QUEUE_OK)
-    {
-        while (1)
-        {
-            __NOP();
-        }
-    }
-
-
-    /*=========================================================================
-     * 4. Interrupt I2C Transport
-     *========================================================================*/
-
-    i2c_it_init();
-
-    i2c_it_register_callback(
-        i2c_completion_callback);
-
-
-    /*=========================================================================
-     * 5. DS3231 Device Layer
-     *========================================================================*/
-
-    ds3231_init();
-
-
-    /*=========================================================================
-     * 6. HIL Test - Start WRITE
+    /*
+     * 4. Configure 500 kbit/s
      *
-     * Write a known date/time first. The READ is started only after the
-     * asynchronous WRITE completion event has been processed.
-     *========================================================================*/
+     * CAN clock = 45 MHz
+     *
+     * BRP = 5  -> register value 4
+     * BS1 = 15 -> register value 14
+     * BS2 = 2  -> register value 1
+     * SJW = 1  -> register value 0
+     *
+     * Silent + Loopback enabled
+     */
+    CAN1->BTR =
+          (4U  << 0U)
+        | (14U << 16U)
+        | (1U  << 20U)
+        | (0U  << 24U)
+        | CAN_BTR_LBKM
+        | CAN_BTR_SILM;
 
-    g_ds3231_write_status =
-        ds3231_set_time_async(&s_test_time);
 
-    if (g_ds3231_write_status == DS3231_OK)
+    /* 5. Configure filter bank 0: accept all */
+
+    /* Enter filter initialization mode */
+    CAN1->FMR |= CAN_FMR_FINIT;
+
+    /* Disable filter bank 0 while configuring */
+    CAN1->FA1R &= ~CAN_FA1R_FACT0;
+    /* Mask mode: 0 = mask mode */
+    CAN1->FM1R &= ~CAN_FM1R_FBM0;
+
+    /* 32-bit scale: 1 = 32-bit */
+    CAN1->FS1R |= CAN_FS1R_FSC0;
+
+    /* Assign bank 0 to FIFO0: 0 = FIFO0 */
+    CAN1->FFA1R &= ~CAN_FFA1R_FFA0;
+
+    /* Accept everything */
+    CAN1->sFilterRegister[0].FR1 = 0x00000000U;
+    CAN1->sFilterRegister[0].FR2 = 0x00000000U;
+
+    /* Activate filter bank 0 */
+    CAN1->FA1R |= CAN_FA1R_FACT0;
+
+    /* Leave filter initialization mode */
+    CAN1->FMR &= ~CAN_FMR_FINIT;
+
+
+
+    /* 6. Leave initialization mode */
+    CAN1->MCR &= ~CAN_MCR_INRQ;
+
+    /* Wait until bxCAN leaves INIT mode */
+    while ((CAN1->MSR & CAN_MSR_INAK) != 0U)
     {
-        g_ds3231_test_state =
-            DS3231_TEST_WAIT_WRITE;
     }
-    else
+    //d 
+    /* Test 3: Load TX mailbox 0 only */
+    /* Check mailbox 0 is empty */
+    while ((CAN1->TSR & CAN_TSR_TME0) == 0U)
     {
-        g_ds3231_test_state =
-            DS3231_TEST_FAILED;
-
-        g_ds3231_test_pass = 0U;
-        g_ds3231_test_done = 1U;
     }
 
+    /* Standard ID = 0x123, IDE = 0, RTR = 0, TXRQ = 0 */
+    CAN1->sTxMailBox[0].TIR =
+        (0x123U << CAN_TI0R_STID_Pos);
 
-    /*=========================================================================
-     * Cooperative Super-loop
-     *========================================================================*/
+    /* DLC = 1 */
+    CAN1->sTxMailBox[0].TDTR = 1U;
 
+    /* DATA[0] = 0x5A */
+    CAN1->sTxMailBox[0].TDLR = 0x5AU;
+
+    /* No upper data bytes */
+    CAN1->sTxMailBox[0].TDHR = 0U;
+
+    /* Request transmission */
+    CAN1->sTxMailBox[0].TIR |= CAN_TI0R_TXRQ;
+
+
+    /* Read received frame */
+    rx_id =
+        (uint16_t)((CAN1->sFIFOMailBox[0].RIR &
+                    CAN_RI0R_STID_Msk)
+                    >> CAN_RI0R_STID_Pos);
+
+    rx_dlc =
+        (uint8_t)(CAN1->sFIFOMailBox[0].RDTR &
+                CAN_RDT0R_DLC_Msk);
+
+    rx_data =
+        (uint8_t)(CAN1->sFIFOMailBox[0].RDLR &
+                0xFFU);
+
+    /* Release FIFO0 */
+    CAN1->RF0R = CAN_RF0R_RFOM0;
+
+    /* Stop */
     while (1)
     {
-        /*---------------------------------------------------------------------
-         * Detect an event-queue failure.
-         *
-         * A lost completion event would otherwise leave the device-driver
-         * state machine waiting indefinitely.
-         *--------------------------------------------------------------------*/
-
-        if ((g_i2c_event_post_failures != 0U) &&
-            (g_ds3231_test_done == 0U))
-        {
-            g_ds3231_test_state =
-                DS3231_TEST_FAILED;
-
-            g_ds3231_test_pass = 0U;
-            g_ds3231_test_done = 1U;
-        }
-
-
-        /*---------------------------------------------------------------------
-         * Launch READ after WRITE completion.
-         *
-         * The WRITE completion event only schedules this state.
-         * The next transaction is started here in normal thread context.
-         *--------------------------------------------------------------------*/
-
-        if (g_ds3231_test_state ==
-            DS3231_TEST_READ)
-        {
-            g_ds3231_read_status =
-                ds3231_read_time_async();
-
-            if (g_ds3231_read_status ==
-                DS3231_OK)
-            {
-                g_ds3231_test_state =
-                    DS3231_TEST_WAIT_READ;
-            }
-            else if (g_ds3231_read_status ==
-                     DS3231_BUSY)
-            {
-                /*
-                 * The previous STOP may not yet have released the physical bus.
-                 * Stay in DS3231_TEST_READ and retry on a later super-loop pass.
-                 */
-            }
-            else
-            {
-                g_ds3231_test_state =
-                    DS3231_TEST_FAILED;
-
-                g_ds3231_test_pass = 0U;
-                g_ds3231_test_done = 1U;
-            }
-        }
-
-
-        /*---------------------------------------------------------------------
-         * Middleware Event Dispatcher
-         *--------------------------------------------------------------------*/
-
-        while (eventQueue_poll(&event) ==
-               EVENT_QUEUE_OK)
-        {
-            switch (event.event_id)
-            {
-                /*-------------------------------------------------------------
-                 * I2C transaction completed.
-                 *------------------------------------------------------------*/
-
-                case EVT_I2C_TRANSFER_DONE:
-                {
-                    i2c_status_t result =
-                        (i2c_status_t)
-                            event.param1;
-
-
-                    /*
-                     * First allow the DS3231 device driver to process
-                     * the completed transport transaction.
-                     */
-                    ds3231_on_i2c_complete(
-                        result);
-
-
-                    /*---------------------------------------------------------
-                     * WRITE completion
-                     *--------------------------------------------------------*/
-
-                    if (g_ds3231_test_state ==
-                        DS3231_TEST_WAIT_WRITE)
-                    {
-                        if ((result != I2C_OK) ||
-                            (ds3231_get_state() !=
-                             DS3231_STATE_IDLE))
-                        {
-                            g_ds3231_test_state =
-                                DS3231_TEST_FAILED;
-
-                            g_ds3231_test_pass = 0U;
-                            g_ds3231_test_done = 1U;
-
-                            break;
-                        }
-
-
-                        /*
-                         * Do not start the READ directly here.
-                         *
-                         * Schedule it for the normal super-loop.
-                         */
-                        g_ds3231_test_state =
-                            DS3231_TEST_READ;
-
-                        break;
-                    }
-
-
-                    /*---------------------------------------------------------
-                     * READ completion
-                     *--------------------------------------------------------*/
-
-                    if (g_ds3231_test_state ==
-                        DS3231_TEST_WAIT_READ)
-                    {
-                        ds3231_time_t time;
-
-
-                        if ((result != I2C_OK) ||
-                            (ds3231_get_state() !=
-                             DS3231_STATE_IDLE))
-                        {
-                            g_ds3231_test_state =
-                                DS3231_TEST_FAILED;
-
-                            g_ds3231_test_pass = 0U;
-                            g_ds3231_test_done = 1U;
-
-                            break;
-                        }
-
-
-                        /*
-                         * Retrieve decoded application-level time.
-                         */
-                        g_ds3231_get_status =
-                            ds3231_get_time(
-                                &time);
-
-
-                        if (g_ds3231_get_status !=
-                            DS3231_OK)
-                        {
-                            g_ds3231_test_state =
-                                DS3231_TEST_FAILED;
-
-                            g_ds3231_test_pass = 0U;
-                            g_ds3231_test_done = 1U;
-
-                            break;
-                        }
-
-
-                        /*
-                         * Save result so it is easy to inspect using GDB.
-                         */
-                        g_ds3231_readback =
-                            time;
-
-
-                        /*
-                         * Verify write -> physical RTC -> read-back.
-                         *
-                         * Seconds are allowed to advance while the
-                         * asynchronous transactions are executing.
-                         */
-                        if ((time.seconds <= 5U) &&
-                            (time.minutes == 55U) &&
-                            (time.hours   == 12U) &&
-                            (time.day     == 1U) &&
-                            (time.date    == 16U) &&
-                            (time.month   == 8U) &&
-                            (time.year    == 2026U))
-                        {
-                            g_ds3231_test_pass =
-                                1U;
-
-                            g_ds3231_test_state =
-                                DS3231_TEST_DONE;
-                        }
-                        else
-                        {
-                            g_ds3231_test_pass =
-                                0U;
-
-                            g_ds3231_test_state =
-                                DS3231_TEST_FAILED;
-                        }
-
-
-                        g_ds3231_test_done =
-                            1U;
-
-                        break;
-                    }
-
-
-                    break;
-                }
-
-
-                /*-------------------------------------------------------------
-                 * Existing UART event path
-                 *------------------------------------------------------------*/
-
-                case EVT_UART_FRAME_READY:
-
-                    /*
-                     * Existing UART/frame processing.
-                     */
-                    break;
-
-
-                case EVT_NONE:
-                default:
-
-                    break;
-            }
-        }
-
-
-        /*
-         * Leave the MCU running.
-         *
-         * The test result remains available through the global
-         * debugger variables.
-         */
     }
+
 }
+
+// Check this out
+// p/x ((CAN1->RF0R & CAN_RF0R_FMP0_Msk) >> CAN_RF0R_FMP0_Pos)
+// p/x CAN1->RF0R
