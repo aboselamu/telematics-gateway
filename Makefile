@@ -32,19 +32,21 @@ INCLUDES = -Iapp/inc \
 		   
 
 # --- Compiler flags ---
-
+# //l
 CFLAGS = \
-	$(ARCH_FLAGS) \
-	-DSTM32F446xx \
-	-DDEBUG \
-	$(INCLUDES) \
-	-Wall \
-	-Wextra \
-	-std=c11 \
-	-O0 \
-	-g3 \
-	-ffunction-sections \
-	-fdata-sections
+    $(ARCH_FLAGS) \
+    -DSTM32F446xx \
+    -DDEBUG \
+    $(INCLUDES) \
+    -Wall \
+    -Wextra \
+    -std=c11 \
+    -g3 \
+    -Og \
+    -ffunction-sections \
+    -fdata-sections \
+    -fno-common
+
 
 
 # --- Linker flags ---

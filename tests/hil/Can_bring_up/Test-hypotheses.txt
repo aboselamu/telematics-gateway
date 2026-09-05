@@ -1,0 +1,35 @@
+For this test:
+
+Hypothesis 1:
+CAN1 peripheral clock is enabled.
+
+Evidence:
+RCC->APB1ENR.CAN1EN = 1
+
+====================
+
+Hypothesis 2:
+bxCAN entered initialization mode.
+
+Evidence:
+MCR.INRQ = 1
+MSR.INAK = 1
+
+===================
+
+Hypothesis 3:
+Bit timing is what I designed.
+
+Evidence:
+BTR = 0xC01E0004
+
+===================
+
+Hypothesis 4:
+bxCAN entered operational silent-loopback mode.
+
+Evidence:
+MCR.INRQ = 0
+MSR.INAK = 0
+BTR.LBKM = 1
+BTR.SILM = 1
