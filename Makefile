@@ -63,6 +63,7 @@ LDFLAGS = \
 
 # --- Object Files ---
 C_OBJS = $(BUILD_DIR)/main.o \
+         $(BUILD_DIR)/can.o \
          $(BUILD_DIR)/event_queue.o \
          $(BUILD_DIR)/nmea_parser.o \
 		 $(BUILD_DIR)/gps_decoder.o \
@@ -72,6 +73,7 @@ C_OBJS = $(BUILD_DIR)/main.o \
          $(BUILD_DIR)/i2c_driver_it.o \
 		 $(BUILD_DIR)/ds3231.o \
          $(BUILD_DIR)/dma_driver.o \
+		 $(BUILD_DIR)/timebase.o \
          $(BUILD_DIR)/system_stm32f4xx.o
 
 
@@ -87,10 +89,14 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 	
 # -----------------------------------------------------------------------------
-# Explicit C compilation rules (The KOAS Strategy)
+# Explicit C compilation rules (The KOAS Strategy, my previous project way)
 # -----------------------------------------------------------------------------
 $(BUILD_DIR)/main.o: app/src/main.c
 	@echo "  CC  app/src/main.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/can.o: app/src/can.c
+	@echo "  CC  app/src/can.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/event_queue.o: middleware/event_queue/src/event_queue.c
@@ -137,6 +143,11 @@ $(BUILD_DIR)/dma_driver.o: drivers/peripheral/dma/src/dma_driver.c
 $(BUILD_DIR)/system_stm32f4xx.o: platform/src/system_stm32f4xx.c
 	@echo "  CC  platform/src/system_stm32f4xx.c"
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/timebase.o: platform/src/timebase.c
+	@echo "  CC  platform/src/timebase.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
 
 # -----------------------------------------------------------------------------
 # Explicit Assembly compilation rule
