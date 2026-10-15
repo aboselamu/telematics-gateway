@@ -1,7 +1,12 @@
 #include "stm32f446xx.h"
-#include "can.h"
+#include "can_driver.h"
 #include <stddef.h>
 #include "timebase.h"
+
+volatile int g_can_init_result;
+volatile CAN_Status_t g_can_tx_status;
+volatile CAN_Status_t g_can_rx_status;
+CAN_frame_t g_can_received_frame;
 
 /*=============================================================================
  * System Clock
@@ -171,7 +176,13 @@ void SystemClock_Config(void)
 int main(void)
 {
     SystemClock_Config();
-    CAN1_Init();
+    g_can_init_result = CAN1_Init();
+    if (g_can_init_result == CAN_OK)
+    {
+        const CAN_frame_t test = {.id = 0x123U, .dlc = 1U, .data = {0x5AU}};
+        g_can_tx_status = CAN1_SendPolling(&test);
+        g_can_rx_status = CAN1_Read(&g_can_received_frame);
+    }
 
     // CAN_frame_t rx_cframe = {0};
     CAN_frame_t tx_cframe;
