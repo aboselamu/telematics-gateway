@@ -167,46 +167,49 @@ void SystemClock_Config(void)
     // SystemCoreClockUpdate();
 }
 
+
 int main(void)
 {
     SystemClock_Config();
-
-    Timebase_Init();
-    volatile uint32_t t1 = millis();
-    for (volatile uint32_t i = 0U; i < 1000000U; i++)
-    {
-    }
-
-    volatile uint32_t t2 = millis();
+    CAN1_Init();
 
     // CAN_frame_t rx_cframe = {0};
-    // CAN_frame_t tx_cframe;
-    // volatile CAN_Status_t tx_status;
-    // volatile CAN_Status_t rx_status;
+    CAN_frame_t tx_cframe;
+    
+    tx_cframe.id = 0x101U;
+    tx_cframe.dlc = 1U;
+    tx_cframe.data[0] = 0x11U;
 
-    // tx_cframe.id = 0x123U;
-    // tx_cframe.dlc = 8U;
+    CAN_frame_t frames[3] = {0};
+    volatile CAN_Status_t read_status;
 
-    // tx_cframe.data[0] = 0x11U;
-    // tx_cframe.data[1] = 0x22U;
-    // tx_cframe.data[2] = 0x33U;
-    // tx_cframe.data[3] = 0x44U;
-    // tx_cframe.data[4] = 0x55U;
-    // tx_cframe.data[5] = 0x66U;
-    // tx_cframe.data[6] = 0x77U;
-    // tx_cframe.data[7] = 0x88U;
+    CAN1_SendPolling(&tx_cframe);
+    /* Frame 2 */
+    tx_cframe.id = 0x102U;
+    tx_cframe.dlc = 1U;
+    tx_cframe.data[0] = 0x22U;
 
-    // CAN1_Init();
+    CAN1_SendPolling(&tx_cframe);
 
-    // tx_status = CAN1_SendPolling(&tx_cframe);
-   
-    // rx_status = CAN1_ReceivePolling(&rx_cframe);
+    /* Frame 3 */
+    tx_cframe.id = 0x103U;
+    tx_cframe.dlc = 1U;
+    tx_cframe.data[0] = 0x33U;
 
-    /* Stop */
+    CAN1_SendPolling(&tx_cframe);
+
+    CAN_Status_t s0;
+    CAN_Status_t s1;
+    CAN_Status_t s2;
+
+    s0 = CAN1_Read(&frames[0]);
+    s1 = CAN1_Read(&frames[1]);
+    s2 = CAN1_Read(&frames[2]);
+
     while (1)
     {
     }
-
+        
 }
 
 // Check this out
