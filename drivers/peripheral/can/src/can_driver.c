@@ -109,6 +109,18 @@ CAN_Status_t CAN1_InitMode(CAN_Mode_t mode)
     {
         return CAN_ERROR_INIT_TIMEOUT;
     }
+    
+    /* Disable automatic retransmission during physical-bus diagnostics.
+    * One transmission attempt per software request.
+    */
+    if (mode == CAN_MODE_NORMAL)
+    {
+        CAN1->MCR |= CAN_MCR_NART;
+    }
+    else
+    {
+        CAN1->MCR &= ~CAN_MCR_NART;
+    }
 
     /* RX interrupt only. TX completion is owned by the polling API.
      * Do not enable CAN1_TX_IRQn until an actual async TX design exists.

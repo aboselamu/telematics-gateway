@@ -8,6 +8,51 @@ volatile CAN_Status_t g_can_tx_status;
 volatile CAN_Status_t g_can_rx_status;
 CAN_frame_t g_can_received_frame;
 
+#include "can_driver.h"
+#include "stm32f446xx.h"
+
+volatile CAN_Status_t g_bus_f446_init_status = CAN_ERROR_INIT_TIMEOUT;
+volatile CAN_Status_t g_bus_f446_tx_status = CAN_ERROR_TX;
+volatile uint32_t g_bus_f446_done = 0U;
+volatile uint32_t g_bus_f446_btr = 0U;
+volatile uint32_t g_bus_f446_esr = 0U;
+volatile uint32_t g_bus_f446_tsr = 0U;
+
+volatile uint32_t g_rev_ready = 0U;
+volatile uint32_t g_rev_done = 0U;
+volatile uint32_t g_rev_pass = 0U;
+
+volatile CAN_Status_t g_rev_init_status = CAN_ERROR_INIT_TIMEOUT;
+volatile CAN_Status_t g_rev_rx_status = CAN_ERROR_RX_EMPTY;
+
+volatile uint32_t g_rev_btr = 0U;
+volatile uint32_t g_rev_rx_id = 0U;
+volatile uint32_t g_rev_rx_dlc = 0U;
+volatile uint32_t g_rev_rx_data0 = 0U;
+volatile uint32_t g_rev_esr = 0U;
+volatile uint32_t g_rev_rx_drops = 0U;
+
+/* Call this ONCE from foreground AFTER clock and timebase initialization,
+ * and INSTEAD of the old loopback test. F103 must already be running.
+ */
+static void run_can_physical_tx_test(void)
+{
+    const CAN_frame_t frame = {
+        .id = 0x123U,
+        .dlc = 1U,
+        .data = {0x5AU}
+    };
+    g_bus_f446_init_status = CAN1_InitMode(CAN_MODE_NORMAL);
+    g_bus_f446_btr = CAN1->BTR;
+    if (g_bus_f446_init_status == CAN_OK)
+    {
+        g_bus_f446_tx_status = CAN1_SendPolling(&frame);
+    }
+    g_bus_f446_esr = CAN1->ESR;
+    g_bus_f446_tsr = CAN1->TSR;
+    g_bus_f446_done = 1U;
+}
+
 /*=============================================================================
  * System Clock
  *============================================================================*/
@@ -173,55 +218,64 @@ void SystemClock_Config(void)
 }
 
 
+
+
+
 int main(void)
 {
     SystemClock_Config();
-    g_can_init_result = CAN1_Init();
-    if (g_can_init_result == CAN_OK)
+    Timebase_Init();
+
+    /* Initialize physical CAN receiver */
+    g_rev_init_status = CAN1_InitMode(CAN_MODE_NORMAL);
+    g_rev_btr = CAN1->BTR;
+
+    if (g_rev_init_status == CAN_OK)
     {
-        const CAN_frame_t test = {.id = 0x123U, .dlc = 1U, .data = {0x5AU}};
-        g_can_tx_status = CAN1_SendPolling(&test);
-        g_can_rx_status = CAN1_Read(&g_can_received_frame);
+        g_rev_ready = 1U;
+
+        while (g_rev_done == 0U)
+        {
+            CAN_frame_t frame = {0};
+
+            /* Read from software queue populated by CAN RX ISR */
+            CAN_Status_t status = CAN1_Read(&frame);
+
+            if (status == CAN_OK)
+            {
+                g_rev_rx_status = status;
+                g_rev_rx_id = frame.id;
+                g_rev_rx_dlc = frame.dlc;
+                g_rev_rx_data0 = frame.data[0];
+
+                g_rev_esr = CAN1->ESR;
+                g_rev_rx_drops = CAN1_RxDropCount();
+
+                if ((frame.id == 0x321U) &&
+                    (frame.dlc == 1U) &&
+                    (frame.data[0] == 0xA5U))
+                {
+                    g_rev_pass = 1U;
+                }
+
+                g_rev_done = 1U;
+            }
+            else if (status != CAN_ERROR_RX_EMPTY)
+            {
+                g_rev_rx_status = status;
+                g_rev_esr = CAN1->ESR;
+                g_rev_done = 1U;
+            }
+        }
     }
-
-    // CAN_frame_t rx_cframe = {0};
-    CAN_frame_t tx_cframe;
-    
-    tx_cframe.id = 0x101U;
-    tx_cframe.dlc = 1U;
-    tx_cframe.data[0] = 0x11U;
-
-    CAN_frame_t frames[3] = {0};
-    volatile CAN_Status_t read_status;
-
-    CAN1_SendPolling(&tx_cframe);
-    /* Frame 2 */
-    tx_cframe.id = 0x102U;
-    tx_cframe.dlc = 1U;
-    tx_cframe.data[0] = 0x22U;
-
-    CAN1_SendPolling(&tx_cframe);
-
-    /* Frame 3 */
-    tx_cframe.id = 0x103U;
-    tx_cframe.dlc = 1U;
-    tx_cframe.data[0] = 0x33U;
-
-    CAN1_SendPolling(&tx_cframe);
-
-    CAN_Status_t s0;
-    CAN_Status_t s1;
-    CAN_Status_t s2;
-
-    s0 = CAN1_Read(&frames[0]);
-    s1 = CAN1_Read(&frames[1]);
-    s2 = CAN1_Read(&frames[2]);
 
     while (1)
     {
+        __NOP();
     }
-        
 }
+
+
 
 // Check this out
 // whether the driver should zero the unused bytes.
