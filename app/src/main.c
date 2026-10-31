@@ -1,7 +1,51 @@
 #include "stm32f446xx.h"
-#include "can.h"
+#include "can_driver.h"
 #include <stddef.h>
 #include "timebase.h"
+#include "event_queue.h"
+
+volatile int g_can_init_result;
+volatile CAN_Status_t g_can_tx_status;
+volatile CAN_Status_t g_can_rx_status;
+CAN_frame_t g_can_received_frame;
+
+#include "can_driver.h"
+#include "stm32f446xx.h"
+
+volatile CAN_Status_t g_bus_f446_init_status = CAN_ERROR_INIT_TIMEOUT;
+volatile CAN_Status_t g_bus_f446_tx_status = CAN_ERROR_TX;
+volatile uint32_t g_bus_f446_done = 0U;
+volatile uint32_t g_bus_f446_btr = 0U;
+volatile uint32_t g_bus_f446_esr = 0U;
+volatile uint32_t g_bus_f446_tsr = 0U;
+
+volatile uint32_t g_rev_ready = 0U;
+volatile uint32_t g_rev_done = 0U;
+volatile uint32_t g_rev_pass = 0U;
+
+volatile CAN_Status_t g_rev_init_status = CAN_ERROR_INIT_TIMEOUT;
+volatile CAN_Status_t g_rev_rx_status = CAN_ERROR_RX_EMPTY;
+
+volatile uint32_t g_rev_btr = 0U;
+volatile uint32_t g_rev_rx_id = 0U;
+volatile uint32_t g_rev_rx_dlc = 0U;
+volatile uint32_t g_rev_rx_data0 = 0U;
+volatile uint32_t g_rev_esr = 0U;
+volatile uint32_t g_rev_rx_drops = 0U;
+
+volatile uint32_t g_multi_ready = 0U;
+volatile uint32_t g_multi_done = 0U;
+
+volatile uint32_t g_multi_received = 0U;
+volatile uint32_t g_multi_pass = 0U;
+volatile uint32_t g_multi_bad = 0U;
+
+volatile CAN_Status_t g_multi_init_status =
+    CAN_ERROR_INIT_TIMEOUT;
+
+volatile uint32_t g_multi_btr = 0U;
+volatile uint32_t g_multi_esr = 0U;
+volatile uint32_t g_multi_drops = 0U;
 
 /*=============================================================================
  * System Clock
@@ -167,46 +211,137 @@ void SystemClock_Config(void)
     // SystemCoreClockUpdate();
 }
 
+
+
+
+
+
+/* CAN event HIL: F103 #1 sends ID=0x321, DLC=1, DATA[0]=0xA5
+ * five times. F446 receives via ISR -> ring buffer -> event queue.
+ */
+#define CAN_EVENT_TEST_FRAMES 5U
+
+volatile CAN_Status_t g_can_ev_init_status = CAN_ERROR_INIT_TIMEOUT;
+volatile uint32_t g_can_ev_ready = 0U;
+volatile uint32_t g_can_ev_done = 0U;
+volatile uint32_t g_can_ev_pass = 0U;
+volatile uint32_t g_can_ev_btr = 0U;
+volatile uint32_t g_can_ev_received = 0U;
+volatile uint32_t g_can_ev_valid = 0U;
+volatile uint32_t g_can_ev_invalid = 0U;
+volatile uint32_t g_can_ev_events_dispatched = 0U;
+volatile uint32_t g_can_ev_post_failures = 0U;
+volatile uint32_t g_can_ev_recoveries = 0U;
+volatile uint32_t g_can_ev_rx_drops = 0U;
+volatile uint32_t g_can_ev_esr = 0U;
+
+/* ISR-context callback: notification only, no CAN frame parsing here. */
+static void can_rx_notify(void)
+{
+    const event_t evt = {
+        .event_id = EVT_CAN_RX_READY,
+        .timestamp = millis(),
+        .param1 = 0U,
+        .param2 = 0U
+    };
+
+    if (eventQueue_post(&evt) != EVENT_QUEUE_OK)
+    {
+        ++g_can_ev_post_failures;
+    }
+}
+
+/* Runs in main context, not inside the CAN interrupt. */
+static void can_process_queued_frames(void)
+{
+    CAN_frame_t frame;
+
+    while (CAN1_Read(&frame) == CAN_OK)
+    {
+        ++g_can_ev_received;
+        if ((frame.id == 0x321U) &&
+            (frame.dlc == 1U) &&
+            (frame.data[0] == 0xA5U))
+        {
+            ++g_can_ev_valid;
+        }
+        else
+        {
+            ++g_can_ev_invalid;
+        }
+    }
+}
+
+static void gateway_dispatch_event(const event_t *evt)
+{
+    switch (evt->event_id)
+    {
+        case EVT_CAN_RX_READY:
+            ++g_can_ev_events_dispatched;
+            can_process_queued_frames();
+            break;
+
+        case EVT_UART_FRAME_READY:
+        case EVT_I2C_TRANSFER_DONE:
+            /* UART and I2C are not active in this CAN-only HIL image.
+             * Future gateway dispatcher will route these to services.
+             */
+            break;
+
+        default:
+            break;
+    }
+}
+
 int main(void)
 {
     SystemClock_Config();
-
     Timebase_Init();
-    volatile uint32_t t1 = millis();
-    for (volatile uint32_t i = 0U; i < 1000000U; i++)
+
+    /* Queue must exist before ISR can post. */
+    (void)eventQueue_init();
+    CAN1_RegisterRxCallback(can_rx_notify);
+
+    g_can_ev_init_status = CAN1_InitMode(CAN_MODE_NORMAL);
+    g_can_ev_btr = CAN1->BTR;
+
+    if (g_can_ev_init_status == CAN_OK)
     {
+        g_can_ev_ready = 1U;
+        uint32_t post_failures_seen = 0U;
+
+        while (g_can_ev_received < CAN_EVENT_TEST_FRAMES)
+        {
+            event_t evt;
+            if (eventQueue_poll(&evt) == EVENT_QUEUE_OK)
+            {
+                gateway_dispatch_event(&evt);
+            }
+            else if (g_can_ev_post_failures != post_failures_seen)
+            {
+                /* Recover unannounced frames if event queue was full. */
+                post_failures_seen = g_can_ev_post_failures;
+                ++g_can_ev_recoveries;
+                can_process_queued_frames();
+            }
+        }
     }
 
-    volatile uint32_t t2 = millis();
+    g_can_ev_rx_drops = CAN1_RxDropCount();
+    g_can_ev_esr = CAN1->ESR;
+    g_can_ev_pass = (g_can_ev_init_status == CAN_OK &&
+                     g_can_ev_received == CAN_EVENT_TEST_FRAMES &&
+                     g_can_ev_valid == CAN_EVENT_TEST_FRAMES &&
+                     g_can_ev_invalid == 0U &&
+                     g_can_ev_events_dispatched != 0U &&
+                     g_can_ev_post_failures == 0U &&
+                     g_can_ev_rx_drops == 0U) ? 1U : 0U;
+    g_can_ev_done = 1U;
 
-    // CAN_frame_t rx_cframe = {0};
-    // CAN_frame_t tx_cframe;
-    // volatile CAN_Status_t tx_status;
-    // volatile CAN_Status_t rx_status;
-
-    // tx_cframe.id = 0x123U;
-    // tx_cframe.dlc = 8U;
-
-    // tx_cframe.data[0] = 0x11U;
-    // tx_cframe.data[1] = 0x22U;
-    // tx_cframe.data[2] = 0x33U;
-    // tx_cframe.data[3] = 0x44U;
-    // tx_cframe.data[4] = 0x55U;
-    // tx_cframe.data[5] = 0x66U;
-    // tx_cframe.data[6] = 0x77U;
-    // tx_cframe.data[7] = 0x88U;
-
-    // CAN1_Init();
-
-    // tx_status = CAN1_SendPolling(&tx_cframe);
-   
-    // rx_status = CAN1_ReceivePolling(&rx_cframe);
-
-    /* Stop */
     while (1)
     {
+        __NOP();
     }
-
 }
 
 // Check this out

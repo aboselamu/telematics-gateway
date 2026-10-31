@@ -23,6 +23,7 @@ INCLUDES = -Iapp/inc \
 		   -Imiddleware/frame_manager/inc \
            -Idrivers/peripheral/uart \
            -Idrivers/peripheral/i2c/inc \
+           -Idrivers/peripheral/can/inc \
 		   -Idrivers/device/ds3231/inc \
 		   -Itests/hil/I2C_Int_Queue/inc \
            -Idrivers/peripheral/dma/inc \
@@ -63,7 +64,6 @@ LDFLAGS = \
 
 # --- Object Files ---
 C_OBJS = $(BUILD_DIR)/main.o \
-         $(BUILD_DIR)/can.o \
          $(BUILD_DIR)/event_queue.o \
          $(BUILD_DIR)/nmea_parser.o \
 		 $(BUILD_DIR)/gps_decoder.o \
@@ -71,6 +71,7 @@ C_OBJS = $(BUILD_DIR)/main.o \
          $(BUILD_DIR)/uart_driver.o \
          $(BUILD_DIR)/i2c_driver.o \
          $(BUILD_DIR)/i2c_driver_it.o \
+         $(BUILD_DIR)/can_driver.o \
 		 $(BUILD_DIR)/ds3231.o \
          $(BUILD_DIR)/dma_driver.o \
 		 $(BUILD_DIR)/timebase.o \
@@ -93,10 +94,6 @@ $(BUILD_DIR):
 # -----------------------------------------------------------------------------
 $(BUILD_DIR)/main.o: app/src/main.c
 	@echo "  CC  app/src/main.c"
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/can.o: app/src/can.c
-	@echo "  CC  app/src/can.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/event_queue.o: middleware/event_queue/src/event_queue.c
@@ -126,6 +123,10 @@ $(BUILD_DIR)/i2c_driver.o: drivers/peripheral/i2c/src/i2c_driver.c
 
 $(BUILD_DIR)/i2c_driver_it.o: drivers/peripheral/i2c/src/i2c_driver_it.c
 	@echo "  CC  drivers/peripheral/i2c/src/i2c_driver_it.c"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/can_driver.o: drivers/peripheral/can/src/can_driver.c
+	@echo "  CC  drivers/peripheral/can/src/can_driver.c"
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/ds3231.o: drivers/device/ds3231/src/ds3231.c
