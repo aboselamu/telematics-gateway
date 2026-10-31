@@ -19,6 +19,13 @@ static volatile uint8_t s_rx_head;
 static volatile uint8_t s_rx_tail;
 static volatile CAN_frame_t s_rx_queue[CAN_RX_QUEUE_SIZE];
 static volatile uint32_t s_rx_drops;
+static CAN_RxCallback_t s_rx_callback = NULL;
+
+void CAN1_RegisterRxCallback(CAN_RxCallback_t callback)
+{
+    /* Caller configures this before CAN interrupts are enabled. */
+    s_rx_callback = callback;
+}
 
 static void can1_gpio_init(void)
 {
@@ -104,15 +111,7 @@ CAN_Status_t CAN1_InitMode(CAN_Mode_t mode)
     CAN1->FA1R |= CAN_FA1R_FACT0;
     CAN1->FMR &= ~CAN_FMR_FINIT;
 
-    CAN1->MCR &= ~CAN_MCR_INRQ;
-    if (!can1_wait_inak(0U))
-    {
-        return CAN_ERROR_INIT_TIMEOUT;
-    }
-    
-    /* Disable automatic retransmission during physical-bus diagnostics.
-    * One transmission attempt per software request.
-    */
+    /* Configure one-shot transmission while still in initialization mode. */
     if (mode == CAN_MODE_NORMAL)
     {
         CAN1->MCR |= CAN_MCR_NART;
@@ -120,6 +119,12 @@ CAN_Status_t CAN1_InitMode(CAN_Mode_t mode)
     else
     {
         CAN1->MCR &= ~CAN_MCR_NART;
+    }
+
+    CAN1->MCR &= ~CAN_MCR_INRQ;
+    if (!can1_wait_inak(0U))
+    {
+        return CAN_ERROR_INIT_TIMEOUT;
     }
 
     /* RX interrupt only. TX completion is owned by the polling API.
@@ -266,5 +271,11 @@ void CAN1_RX0_IRQHandler(void)
         }
         s_rx_head = next; /* publish only after frame was copied completely */
         CAN1->RF0R = CAN_RF0R_RFOM0;
+
+        /* Notify upper layer after committing frame, while still in IRQ. */
+        if (s_rx_callback != NULL)
+        {
+            s_rx_callback();
+        }
     }
 }

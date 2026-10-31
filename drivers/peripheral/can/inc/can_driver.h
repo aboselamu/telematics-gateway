@@ -42,6 +42,12 @@ CAN_Status_t CAN1_InitMode(CAN_Mode_t mode);
 CAN_Status_t CAN1_SendPolling(const CAN_frame_t *frame);
 CAN_Status_t CAN1_Read(CAN_frame_t *frame);
 
+/* Optional ISR-context notification, called after a CAN frame is queued.
+ * Register before enabling the CAN RX interrupt. Callback must not block.
+ */
+typedef void (*CAN_RxCallback_t)(void);
+void CAN1_RegisterRxCallback(CAN_RxCallback_t callback);
+
 /* Diagnostic: count frames dropped because the software RX queue was full. */
 uint32_t CAN1_RxDropCount(void);
 

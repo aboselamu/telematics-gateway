@@ -1,6 +1,5 @@
 #include "event_queue.h"
 // #include "system.h"
-#include "stm32f4xx.h" 
 #include "stm32f4xx.h"
 #include <stddef.h>
 

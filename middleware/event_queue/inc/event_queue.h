@@ -21,7 +21,9 @@ typedef enum
 
     EVT_UART_FRAME_READY,
 
-    EVT_I2C_TRANSFER_DONE
+    EVT_I2C_TRANSFER_DONE,
+
+    EVT_CAN_RX_READY
 
 } event_id_t;
 
